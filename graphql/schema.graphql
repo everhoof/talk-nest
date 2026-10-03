@@ -45,6 +45,8 @@ type Mutation {
   invalidateCurrentToken: Boolean!
   invalidateTokenById(id: Int!): Boolean!
   invalidateAllTokens: Boolean!
+  createPoll(question: String!, options: [String!]!): Message!
+  votePoll(messageId: Int!, optionIndex: Int!): Poll!
 }
 
 type Picture {
@@ -70,6 +72,19 @@ type PictureRepresentation {
   link: String!
 }
 
+type Poll {
+  messageId: Int!
+  question: String!
+  options: [PollOption!]!
+  selectedOption: Int
+  totalVotes: Int
+}
+
+type PollOption {
+  label: String!
+  votes: Int
+}
+
 enum PunishmentTypes {
   ban
   mute
@@ -84,6 +99,7 @@ type Query {
   isUsernameFree(username: String!): Boolean!
   getTokenByDiscordId(id: String!): Token
   getTokens: [Token!]!
+  getPoll(messageId: Int!): Poll!
   getGrants: String!
   getHello: String!
   version: String!

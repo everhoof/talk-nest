@@ -8,6 +8,8 @@ import { AccountsModule } from '@modules/accounts/accounts.module';
 import { UploadModule } from '@modules/upload/upload.module';
 import { PunishmentsRepository } from '@modules/users/repositories/punishments.repository';
 import { UsersRepository } from '@modules/users/repositories/users.repository';
+import { PollsService } from './polls.service';
+import { PollsResolver } from './polls.resolver';
 
 @Module({
   imports: [
@@ -15,7 +17,7 @@ import { UsersRepository } from '@modules/users/repositories/users.repository';
     AccountsModule,
     UploadModule,
   ],
-  providers: [MessagesService, MessagesResolver],
+  providers: [MessagesService, MessagesResolver, PollsService, PollsResolver],
   exports: [MessagesService],
 })
 export class MessagesModule {}
