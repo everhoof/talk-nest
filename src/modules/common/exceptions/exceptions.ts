@@ -5,6 +5,9 @@ export type ExceptionMessage = 'en' | 'ru';
 export type ExceptionKey =
   | 'POLL_INVALID'
   | 'POLL_ALREADY_VOTED'
+  | 'POLL_CLOSED'
+  | 'POLL_END_TIME_INVALID'
+  | 'POLL_MULTIPLE_VOTES_EXIST'
   | 'UNKNOWN'
   | 'FORBIDDEN'
   | 'USER_DOES_NOT_EXIST'
@@ -40,9 +43,21 @@ type Exception = {
 };
 
 const exceptions: Exception = {
+  POLL_CLOSED: {
+    en: 'This poll has ended',
+    ru: 'Опрос завершён',
+  },
+  POLL_END_TIME_INVALID: {
+    en: 'The poll end time must be in the future',
+    ru: 'Время завершения опроса должно быть в будущем',
+  },
+  POLL_MULTIPLE_VOTES_EXIST: {
+    en: 'Cannot disable multiple answers after participants have selected several options',
+    ru: 'Нельзя отключить несколько ответов, пока есть голоса за несколько вариантов',
+  },
   POLL_INVALID: {
-    en: 'Enter a question and 2–10 different, non-empty options',
-    ru: 'Укажите тему и от 2 до 10 разных непустых вариантов ответа',
+    en: 'Enter a question and 1–20 different, non-empty options',
+    ru: 'Укажите тему и от 1 до 20 разных непустых вариантов ответа',
   },
   POLL_ALREADY_VOTED: {
     en: 'You have already voted in this poll',

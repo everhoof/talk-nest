@@ -4,7 +4,7 @@ import { GraphqlExceptionFilter } from '@modules/common/filters/http-exception.f
 import { CurrentUser, GqlAuthGuard, OptionalGqlAuthGuard } from '@modules/common/guards/auth.guard';
 import { User } from '@modules/users/entities/users.entity';
 import { Message } from './entities/messages.entity';
-import { CreatePollArgs, GetPollArgs, Poll, VotePollArgs } from './polls.types';
+import { CreatePollArgs, GetPollArgs, Poll, UpdatePollArgs, VotePollArgs } from './polls.types';
 import { PollsService } from './polls.service';
 
 @UseFilters(GraphqlExceptionFilter)
@@ -18,6 +18,12 @@ export class PollsResolver {
     return this.polls.createPoll(args, user);
   }
 
+  @UseGuards(GqlAuthGuard)
+  @Mutation(() => Message)
+  updatePoll(@Args() args: UpdatePollArgs, @CurrentUser() user: User): Promise<Message> {
+    return this.polls.updatePoll(args, user);
+  }
+
   @UseGuards(OptionalGqlAuthGuard)
   @Query(() => Poll)
   getPoll(@Args() args: GetPollArgs, @CurrentUser() user?: User): Promise<Poll> {
@@ -28,5 +34,11 @@ export class PollsResolver {
   @Mutation(() => Poll)
   votePoll(@Args() args: VotePollArgs, @CurrentUser() user: User): Promise<Poll> {
     return this.polls.votePoll(args, user);
+  }
+
+  @UseGuards(GqlAuthGuard)
+  @Mutation(() => Poll)
+  closePoll(@Args() args: GetPollArgs, @CurrentUser() user: User): Promise<Poll> {
+    return this.polls.closePoll(args.messageId, user);
   }
 }

@@ -1,21 +1,19 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PubSub } from 'graphql-subscriptions';
-import { IsNull } from 'typeorm';
 import { RoleResources, roles } from '../../app.roles';
 import { User } from '@modules/users/entities/users.entity';
 import { BadRequestException, ForbiddenException } from '@modules/common/exceptions/exceptions';
-import { Utils } from '@modules/common/utils/utils';
-import { Message, MessageSchema, MessageType } from './entities/messages.entity';
+import { Message } from './entities/messages.entity';
 import { PollVotesRepository } from './repositories/poll-votes.repository';
-import { MessagesRepository } from './repositories/messages.repository';
+import { PollsRepository } from './repositories/polls.repository';
 import { MessagesService } from './messages.service';
-import { CreatePollArgs, Poll, VotePollArgs } from './polls.types';
+import { CreatePollArgs, Poll, UpdatePollArgs, VotePollArgs } from './polls.types';
 
 @Injectable()
 export class PollsService {
   constructor(
-    @InjectRepository(MessagesRepository) private readonly messages: MessagesRepository,
+    @InjectRepository(PollsRepository) private readonly polls: PollsRepository,
     @InjectRepository(PollVotesRepository) private readonly votes: PollVotesRepository,
     private readonly messagesService: MessagesService,
     @Inject('PUB_SUB') private readonly pubSub: PubSub,
@@ -26,66 +24,79 @@ export class PollsService {
       throw new ForbiddenException('FORBIDDEN');
     }
     await this.messagesService.throwOnPunished(user.id);
-    const question = args.question.trim();
-    const options = args.options.map((option) => option.trim());
-    if (
-      !question ||
-      question.length > 300 ||
-      options.length < 2 ||
-      options.length > 10 ||
-      options.some((option) => !option || option.length > 100) ||
-      new Set(options.map((option) => option.toLowerCase())).size !== options.length
-    ) {
-      throw new BadRequestException('POLL_INVALID');
-    }
-    const message = await this.messages.saveAndReturn(
-      this.messages.create({
-        ownerId: user.id,
-        username: user.username,
-        content: '',
-        randomId: Utils.getRandomString(32),
-        type: MessageType.POLL,
-        schema: MessageSchema.POLL,
-        json: JSON.stringify({ question, options }),
-        pictures: [],
-      }),
-    );
+    const options = this.prepareOptions(args.options);
+    const message = await this.polls.createPoll(user, args.question.trim(), options, {
+      allowMultiple: args.allowMultiple ?? false,
+      allowChangeVote: args.allowChangeVote ?? false,
+      endsAt: args.endsAt ?? null,
+    });
     await this.pubSub.publish('messageCreated', { messageCreated: message });
     return message;
   }
 
-  async getPoll(messageId: number, user?: User): Promise<Poll> {
-    const message = await this.messages.findOne({ where: { id: messageId, deletedAt: IsNull() } });
-    if (!message || message.type !== MessageType.POLL || !message.json) {
-      throw new BadRequestException('MESSAGE_NOT_FOUND');
+  async updatePoll(args: UpdatePollArgs, user: User): Promise<Message> {
+    if (!roles.can(user.roleNames).updateAny(RoleResources.POLL).granted) {
+      throw new ForbiddenException('FORBIDDEN');
     }
-    const { question, options } = JSON.parse(message.json);
+    await this.messagesService.throwOnPunished(user.id);
+    const labels = this.prepareOptions(args.options.map((option) => option.label));
+    const options = args.options.map((option, index) => ({ id: option.id, label: labels[index] }));
+    const message = await this.polls.updatePoll(args.messageId, args.question.trim(), options, {
+      allowMultiple: args.allowMultiple ?? undefined,
+      allowChangeVote: args.allowChangeVote ?? undefined,
+      endsAt: args.endsAt,
+    });
+    await this.pubSub.publish('messageUpdated', { messageUpdated: message });
+    return message;
+  }
+
+  private prepareOptions(options: string[]): string[] {
+    const labels = options.map((option) => option.trim());
+    const normalizedOptions = labels.map((option) => option.toLowerCase());
+    const hasDuplicateOptions = new Set(normalizedOptions).size !== normalizedOptions.length;
+    if (hasDuplicateOptions) throw new BadRequestException('POLL_INVALID');
+    return labels;
+  }
+
+  async getPoll(messageId: number, user?: User): Promise<Poll> {
+    const { poll: record, options, ownVotes, counts, isClosed, totalVotes } = await this.polls.getPollData(
+      messageId,
+      user?.id,
+    );
     const poll: Poll = {
       messageId,
-      question,
+      question: record.question,
+      allowMultiple: record.allowMultiple,
+      allowChangeVote: record.allowChangeVote,
+      endsAt: record.endsAt,
+      isClosed,
+      serverTime: new Date(),
+      selectedOptionIds: ownVotes.map((vote) => vote.optionId),
       selectedOption: null,
       totalVotes: null,
-      options: options.map((label: string) => ({ label, votes: null })),
+      options: options.map(({ id, label }) => ({ id, label, votes: null })),
     };
-    // Results stay private until this viewer has voted, including direct GraphQL requests.
-    if (!user) return poll;
-    const ownVote = await this.votes.findOne({ messageId, userId: user.id });
-    if (!ownVote) return poll;
-    const counts = await this.votes.getOptionCounts(messageId);
-    poll.selectedOption = ownVote.optionIndex;
-    poll.totalVotes = 0;
-    poll.options.forEach((option) => {
-      option.votes = 0;
-    });
-    for (const count of counts) {
-      poll.options[count.optionIndex].votes = count.votes;
-      poll.totalVotes += count.votes;
+    // Active poll results stay private until the viewer votes; closed poll results are public.
+    if (!isClosed && !ownVotes.length) return poll;
+    if (ownVotes.length)
+      poll.selectedOption = options.findIndex((option) => poll.selectedOptionIds.includes(option.id));
+    poll.totalVotes = totalVotes;
+    const votesByOption = new Map(counts.map((count) => [count.optionId, count.votes]));
+    for (const option of poll.options) {
+      option.votes = votesByOption.get(option.id) || 0;
     }
     return poll;
   }
 
   async votePoll(args: VotePollArgs, user: User): Promise<Poll> {
-    const message = await this.votes.addVote(args.messageId, user.id, args.optionIndex);
+    const message = await this.votes.addVote(args.messageId, user.id, args.optionIds);
+    await this.pubSub.publish('messageUpdated', { messageUpdated: message });
+    return this.getPoll(message.id, user);
+  }
+  async closePoll(messageId: number, user: User): Promise<Poll> {
+    if (!roles.can(user.roleNames).updateAny(RoleResources.POLL).granted) throw new ForbiddenException('FORBIDDEN');
+    await this.messagesService.throwOnPunished(user.id);
+    const message = await this.polls.closePoll(messageId);
     await this.pubSub.publish('messageUpdated', { messageUpdated: message });
     return this.getPoll(message.id, user);
   }

@@ -1,36 +1,63 @@
-import { EntityRepository } from 'typeorm';
+import { EntityRepository, In } from 'typeorm';
 import { BasicRepository } from '@modules/common/repositories/basic.repository';
 import { BadRequestException } from '@modules/common/exceptions/exceptions';
 import { Message, MessageType } from '../entities/messages.entity';
+import { MessagePoll } from '../entities/polls.entity';
+import { MessagePollOption } from '../entities/poll-options.entity';
 import { PollVote } from '../entities/poll-votes.entity';
 
 @EntityRepository(PollVote)
 export class PollVotesRepository extends BasicRepository<PollVote> {
-  async getOptionCounts(messageId: number): Promise<{ optionIndex: number; votes: number }[]> {
+  async getOptionCounts(messageId: number): Promise<{ optionId: number; votes: number }[]> {
     const counts = await this.createQueryBuilder('vote')
-      .select('vote.optionIndex', 'optionIndex')
+      .select('vote.optionId', 'optionId')
       .addSelect('COUNT(*)', 'votes')
       .where({ messageId })
-      .groupBy('vote.optionIndex')
-      .getRawMany<{ optionIndex: number; votes: string }>();
-    return counts.map((count) => ({ optionIndex: count.optionIndex, votes: Number(count.votes) }));
+      .groupBy('vote.optionId')
+      .getRawMany<{ optionId: number; votes: string }>();
+    return counts.map((count) => ({ optionId: count.optionId, votes: Number(count.votes) }));
   }
 
-  async addVote(messageId: number, userId: number, optionIndex: number): Promise<Message> {
+  async getVoterCount(messageId: number): Promise<number> {
+    const result = await this.createQueryBuilder('vote')
+      .select('COUNT(DISTINCT vote.userId)', 'count')
+      .where({ messageId })
+      .getRawOne<{ count: string }>();
+    return Number(result.count);
+  }
+
+  async hasMultipleSelections(messageId: number): Promise<boolean> {
+    const result = await this.createQueryBuilder('vote')
+      .select('vote.userId')
+      .where({ messageId })
+      .groupBy('vote.userId')
+      .having('COUNT(*) > 1')
+      .limit(1)
+      .getRawOne();
+    return !!result;
+  }
+
+  async addVote(messageId: number, userId: number, optionIds: number[]): Promise<Message> {
     return this.manager.transaction(async (manager) => {
-      const poll = await manager.findOne(Message, messageId, { lock: { mode: 'pessimistic_write' } });
-      if (!poll || poll.type !== MessageType.POLL || poll.deletedAt || !poll.json) {
+      const message = await manager.findOne(Message, messageId, { lock: { mode: 'pessimistic_write' } });
+      const poll = await manager.findOne(MessagePoll, { messageId });
+      if (!message || message.type !== MessageType.POLL || message.deletedAt || !poll) {
         throw new BadRequestException('MESSAGE_NOT_FOUND');
       }
-      const { options } = JSON.parse(poll.json);
-      if (!Number.isInteger(optionIndex) || optionIndex < 0 || optionIndex >= options.length) {
-        throw new BadRequestException('POLL_INVALID');
-      }
-      const existingVote = await manager.findOne(PollVote, { messageId, userId });
-      if (existingVote) throw new BadRequestException('POLL_ALREADY_VOTED');
-      await manager.insert(PollVote, { messageId, userId, optionIndex });
-      poll.updatedAt = new Date();
-      return manager.save(Message, poll);
+      if (poll.isClosed) throw new BadRequestException('POLL_CLOSED');
+      if (!poll.allowMultiple && optionIds.length > 1) throw new BadRequestException('POLL_INVALID');
+      const options = await manager.find(MessagePollOption, { id: In(optionIds), messageId });
+      if (options.length !== optionIds.length) throw new BadRequestException('POLL_INVALID');
+      const existingVotes = await manager.find(PollVote, { messageId, userId });
+      if (existingVotes.length && !poll.allowChangeVote) throw new BadRequestException('POLL_ALREADY_VOTED');
+      // Replace the whole ballot atomically so selections never accumulate on a revote.
+      if (existingVotes.length) await manager.delete(PollVote, { messageId, userId });
+      await manager.insert(
+        PollVote,
+        optionIds.map((optionId) => ({ messageId, userId, optionId })),
+      );
+      message.updatedAt = new Date();
+      return manager.save(Message, message);
     });
   }
 }

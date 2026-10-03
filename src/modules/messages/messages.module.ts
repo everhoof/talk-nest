@@ -11,6 +11,7 @@ import { UsersRepository } from '@modules/users/repositories/users.repository';
 import { PollsService } from './polls.service';
 import { PollsResolver } from './polls.resolver';
 import { PollVotesRepository } from './repositories/poll-votes.repository';
+import { PollsRepository } from './repositories/polls.repository';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { PollVotesRepository } from './repositories/poll-votes.repository';
       PunishmentsRepository,
       UsersRepository,
       PollVotesRepository,
+      PollsRepository,
     ]),
     AccountsModule,
     UploadModule,
