@@ -7,6 +7,7 @@ import { User } from '@modules/users/entities/users.entity';
 import { BadRequestException, ForbiddenException } from '@modules/common/exceptions/exceptions';
 import { Utils } from '@modules/common/utils/utils';
 import { Message, MessageSchema, MessageType } from './entities/messages.entity';
+import { PollVotesRepository } from './repositories/poll-votes.repository';
 import { MessagesRepository } from './repositories/messages.repository';
 import { MessagesService } from './messages.service';
 import { CreatePollArgs, Poll, VotePollArgs } from './polls.types';
@@ -15,6 +16,7 @@ import { CreatePollArgs, Poll, VotePollArgs } from './polls.types';
 export class PollsService {
   constructor(
     @InjectRepository(MessagesRepository) private readonly messages: MessagesRepository,
+    @InjectRepository(PollVotesRepository) private readonly votes: PollVotesRepository,
     private readonly messagesService: MessagesService,
     @Inject('PUB_SUB') private readonly pubSub: PubSub,
   ) {}
@@ -58,52 +60,32 @@ export class PollsService {
       throw new BadRequestException('MESSAGE_NOT_FOUND');
     }
     const { question, options } = JSON.parse(message.json);
-    const ownVotes = user
-      ? await this.messages.query('SELECT option_index FROM poll_votes WHERE message_id = $1 AND user_id = $2', [
-          messageId,
-          user.id,
-        ])
-      : [];
-    const selectedOption: number | null = ownVotes[0]?.option_index ?? null;
-    // Results stay private until this viewer has voted, including direct GraphQL requests.
-    const counts =
-      selectedOption !== null
-        ? await this.messages.query(
-            'SELECT option_index, count(*)::int AS votes FROM poll_votes WHERE message_id = $1 GROUP BY option_index',
-            [messageId],
-          )
-        : [];
-    return {
+    const poll: Poll = {
       messageId,
       question,
-      selectedOption,
-      totalVotes: selectedOption !== null ? counts.reduce((sum, row) => sum + row.votes, 0) : null,
-      options: options.map((label: string, index: number) => ({
-        label,
-        votes: selectedOption !== null ? counts.find((row) => row.option_index === index)?.votes ?? 0 : null,
-      })),
+      selectedOption: null,
+      totalVotes: null,
+      options: options.map((label: string) => ({ label, votes: null })),
     };
+    // Results stay private until this viewer has voted, including direct GraphQL requests.
+    if (!user) return poll;
+    const ownVote = await this.votes.findOne({ messageId, userId: user.id });
+    if (!ownVote) return poll;
+    const counts = await this.votes.getOptionCounts(messageId);
+    poll.selectedOption = ownVote.optionIndex;
+    poll.totalVotes = 0;
+    poll.options.forEach((option) => {
+      option.votes = 0;
+    });
+    for (const count of counts) {
+      poll.options[count.optionIndex].votes = count.votes;
+      poll.totalVotes += count.votes;
+    }
+    return poll;
   }
 
   async votePoll(args: VotePollArgs, user: User): Promise<Poll> {
-    const message = await this.messages.manager.transaction(async (manager) => {
-      const poll = await manager.findOne(Message, args.messageId, { lock: { mode: 'pessimistic_write' } });
-      if (!poll || poll.type !== MessageType.POLL || poll.deletedAt || !poll.json) {
-        throw new BadRequestException('MESSAGE_NOT_FOUND');
-      }
-      const { options } = JSON.parse(poll.json);
-      if (!Number.isInteger(args.optionIndex) || args.optionIndex < 0 || args.optionIndex >= options.length) {
-        throw new BadRequestException('POLL_INVALID');
-      }
-      const inserted = await manager.query(
-        `INSERT INTO poll_votes (message_id, user_id, option_index) VALUES ($1, $2, $3)
-         ON CONFLICT (message_id, user_id) DO NOTHING RETURNING user_id`,
-        [poll.id, user.id, args.optionIndex],
-      );
-      if (inserted.length === 0) throw new BadRequestException('POLL_ALREADY_VOTED');
-      poll.updatedAt = new Date();
-      return manager.save(Message, poll);
-    });
+    const message = await this.votes.addVote(args.messageId, user.id, args.optionIndex);
     await this.pubSub.publish('messageUpdated', { messageUpdated: message });
     return this.getPoll(message.id, user);
   }

@@ -1,9 +1,12 @@
 // Run against the local, migrated database and a running API:
-// node -r ./environment.js scripts/test-polls.js
+// node -r ./environment.js -r ts-node/register -r tsconfig-paths/register scripts/test-polls.js
 /* eslint-disable @typescript-eslint/no-var-requires */
 const assert = require('assert');
 const { randomBytes, pbkdf2Sync } = require('crypto');
-const { Client } = require('pg');
+const { createConnection, In } = require('typeorm');
+const { User } = require('../src/modules/users/entities/users.entity');
+const { Role } = require('../src/modules/roles/entities/roles.entity');
+const { Message } = require('../src/modules/messages/entities/messages.entity');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -11,14 +14,16 @@ const got = require('got');
 
 async function main() {
   assert(['localhost', '127.0.0.1', '::1'].includes(process.env.TYPEORM_HOST), 'Use a local test database');
-  const db = new Client({
-    host: process.env.TYPEORM_HOST,
-    port: Number(process.env.TYPEORM_PORT),
-    user: process.env.TYPEORM_USERNAME,
-    password: process.env.TYPEORM_PASSWORD,
-    database: process.env.TYPEORM_DATABASE,
+  const db = await createConnection({
+    ...require('../ormconfig')[0],
+    name: 'poll-integration-check',
+    migrationsRun: false,
+    logging: false,
+    subscribers: [],
   });
-  await db.connect();
+  const users = db.getRepository(User);
+  const roles = db.getRepository(Role);
+  const messageRepository = db.getRepository(Message);
   const accounts = [];
   const messages = [];
   const password = randomBytes(12).toString('hex');
@@ -44,19 +49,20 @@ async function main() {
       const username = `poll_${role.toLowerCase()}_${suffix}`;
       const salt = randomBytes(48).toString('base64');
       const hash = pbkdf2Sync(password, salt, 10, 48, 'sha512').toString('base64');
-      const {
-        rows,
-      } = await db.query(
-        'INSERT INTO users(username,email,salt,hash,email_confirmed) VALUES($1,$2,$3,$4,$5) RETURNING id',
-        [username, `${username}@example.invalid`, salt, hash, role !== 'USER'],
+      let accountRole = await roles.findOne({ name: role });
+      if (!accountRole) accountRole = await roles.save(roles.create({ name: role }));
+      const user = await users.save(
+        users.create({
+          username,
+          email: `${username}@example.invalid`,
+          salt,
+          hash,
+          emailConfirmed: role !== 'USER',
+          roles: [accountRole],
+        }),
       );
-      const account = { id: rows[0].id, username, role };
+      const account = { id: user.id, username, role };
       accounts.push(account);
-      await db.query('INSERT INTO roles(name) VALUES($1) ON CONFLICT DO NOTHING', [role]);
-      await db.query('INSERT INTO user_roles(user_id,role_id) SELECT $1,id FROM roles WHERE name=$2', [
-        account.id,
-        role,
-      ]);
       const signedIn = await api(
         'mutation($email:String!,$password:String!){signIn(email:$email,password:$password){value}}',
         { email: username, password },
@@ -117,16 +123,17 @@ async function main() {
       'Poll integration checks passed: permissions, validation, privacy, concurrent votes, persistence, deletion.',
     );
   } finally {
-    await db.query('DELETE FROM messages WHERE id=ANY($1::int[])', [messages]);
+    await messageRepository.delete({ id: In(messages) });
     if (passed && process.argv.includes('--keep-accounts')) {
       const fixturePath = path.join(os.tmpdir(), 'everhoof-poll-test-accounts.json');
       fs.writeFileSync(fixturePath, JSON.stringify({ password, accounts }, null, 2));
       console.log(`Local browser test accounts: ${fixturePath}`);
     } else {
-      await db.query('DELETE FROM messages WHERE owner_id=ANY($1::int[])', [accounts.map((account) => account.id)]);
-      await db.query('DELETE FROM users WHERE id=ANY($1::int[])', [accounts.map((account) => account.id)]);
+      const accountIds = accounts.map((account) => account.id);
+      await messageRepository.delete({ ownerId: In(accountIds) });
+      await users.delete({ id: In(accountIds) });
     }
-    await db.end();
+    await db.close();
   }
 }
 
