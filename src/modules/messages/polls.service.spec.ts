@@ -9,7 +9,10 @@ import { PollsService } from './polls.service';
 
 describe('PollsService', () => {
   const polls = { createPoll: jest.fn(), getPollData: jest.fn(), updatePoll: jest.fn(), closePoll: jest.fn() };
-  const votes = { addVote: jest.fn() };
+  const votes = {
+    addVote: jest.fn(),
+    removeVote: jest.fn(),
+  };
   const messagesService = { throwOnPunished: jest.fn() };
   const pubSub = { publish: jest.fn() };
   const user = Object.assign(new User(), { id: 1, username: 'listener', roles: [{ name: AppRoles.USER }] });
@@ -107,6 +110,34 @@ describe('PollsService', () => {
       BadRequestException,
     );
     expect(pubSub.publish).not.toHaveBeenCalled();
+  });
+
+  it('hides results after cancellation and publishes updated counts to subscribers', async () => {
+    const message = {
+      id: 10,
+    };
+    votes.removeVote.mockResolvedValue(message);
+
+    const result = await service.cancelPollVote(10, user);
+
+    expect(votes.removeVote).toHaveBeenCalledWith(10, user.id);
+    expect(pubSub.publish).toHaveBeenCalledWith('messageUpdated', {
+      messageUpdated: message,
+    });
+    expect(polls.getPollData).toHaveBeenCalledWith(10, user.id);
+    expect(result.selectedOptionIds).toEqual([]);
+    expect(result.totalVotes).toBeNull();
+    expect(result.options.every((option) => option.votes === null)).toBe(true);
+  });
+
+  it('does not publish an update when cancellation fails', async () => {
+    votes.removeVote.mockRejectedValue(new BadRequestException('POLL_CLOSED'));
+
+    await expect(service.cancelPollVote(10, user)).rejects.toMatchObject({
+      exception: 'POLL_CLOSED',
+    });
+    expect(pubSub.publish).not.toHaveBeenCalled();
+    expect(polls.getPollData).not.toHaveBeenCalled();
   });
 
   it('returns all selected options while keeping the participant count distinct from selections', async () => {

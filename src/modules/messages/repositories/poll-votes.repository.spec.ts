@@ -100,19 +100,116 @@ describe('PollVotesRepository without a database', () => {
     expect(manager.insert).not.toHaveBeenCalled();
   });
 
-  it('rejects a repeat vote when changes are disabled', async () => {
+  it.each([false, true])('rejects a repeat vote before cancellation with allowChangeVote=%s', async (allowed) => {
+    poll.allowChangeVote = allowed;
     manager.find.mockResolvedValueOnce([{ id: 11 }]).mockResolvedValueOnce([{ optionId: 12 }]);
     await expect(repository.addVote(10, 2, [11])).rejects.toMatchObject({ exception: 'POLL_ALREADY_VOTED' });
     expect(manager.delete).not.toHaveBeenCalled();
     expect(manager.insert).not.toHaveBeenCalled();
   });
 
-  it('replaces the whole ballot of only the current participant', async () => {
+  it('removes the whole ballot of only the current participant under the message lock', async () => {
     poll.allowMultiple = poll.allowChangeVote = true;
-    manager.find.mockResolvedValueOnce([{ id: 13 }]).mockResolvedValueOnce([{ optionId: 11 }, { optionId: 12 }]);
-    await repository.addVote(10, 2, [13]);
-    expect(manager.delete).toHaveBeenCalledWith(PollVote, { messageId: 10, userId: 2 });
-    expect(manager.delete.mock.invocationCallOrder[0]).toBeLessThan(manager.insert.mock.invocationCallOrder[0]);
-    expect(manager.insert).toHaveBeenCalledWith(PollVote, [{ messageId: 10, userId: 2, optionId: 13 }]);
+    const result = await repository.removeVote(10, 2);
+
+    expect(result).toBe(message);
+    expect(manager.findOne).toHaveBeenCalledWith(Message, 10, {
+      lock: {
+        mode: 'pessimistic_write',
+      },
+    });
+    expect(manager.findOne.mock.invocationCallOrder[0]).toBeLessThan(manager.delete.mock.invocationCallOrder[0]);
+    expect(manager.delete).toHaveBeenCalledWith(PollVote, {
+      messageId: 10,
+      userId: 2,
+    });
+    expect(message.updatedAt).toBeInstanceOf(Date);
+    expect(manager.save).toHaveBeenCalledWith(Message, message);
+    expect(manager.insert).not.toHaveBeenCalled();
+  });
+
+  it('rejects cancellation when it is disabled', async () => {
+    await expect(repository.removeVote(10, 2)).rejects.toMatchObject({
+      exception: 'FORBIDDEN',
+    });
+    expect(manager.delete).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+
+  it.each(['manual', 'deadline'])('rejects cancellation after %s closure', async (reason) => {
+    poll.allowChangeVote = true;
+
+    if (reason === 'manual') {
+      poll.closedAt = new Date();
+    }
+
+    if (reason === 'deadline') {
+      poll.endsAt = new Date(Date.now() - 1000);
+    }
+
+    await expect(repository.removeVote(10, 2)).rejects.toMatchObject({
+      exception: 'POLL_CLOSED',
+    });
+    expect(manager.delete).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+
+  it('rejects cancellation in a deleted poll', async () => {
+    poll.allowChangeVote = true;
+    message.deletedAt = new Date();
+
+    await expect(repository.removeVote(10, 2)).rejects.toMatchObject({
+      exception: 'MESSAGE_NOT_FOUND',
+    });
+    expect(manager.delete).not.toHaveBeenCalled();
+  });
+
+  it('allows voting again after cancellation without affecting another participant', async () => {
+    poll.allowMultiple = poll.allowChangeVote = true;
+    let ballots = [
+      {
+        messageId: 10,
+        userId: 2,
+        optionId: 11,
+      },
+      {
+        messageId: 10,
+        userId: 2,
+        optionId: 12,
+      },
+      {
+        messageId: 10,
+        userId: 3,
+        optionId: 12,
+      },
+    ];
+    manager.find.mockImplementation(async (entity, criteria) => {
+      if (entity === MessagePollOption) {
+        return [
+          {
+            id: 11,
+          },
+        ];
+      }
+
+      return ballots.filter((vote) => vote.messageId === criteria.messageId && vote.userId === criteria.userId);
+    });
+    manager.delete.mockImplementation(async (_entity, criteria) => {
+      ballots = ballots.filter((vote) => vote.messageId !== criteria.messageId || vote.userId !== criteria.userId);
+    });
+    manager.insert.mockImplementation(async (_entity, votes) => ballots.push(...votes));
+
+    await repository.removeVote(10, 2);
+    expect(ballots).toHaveLength(1);
+    expect(ballots[0].userId).toBe(3);
+    await repository.removeVote(10, 2);
+    expect(ballots).toHaveLength(1);
+    await repository.addVote(10, 2, [11]);
+    expect(ballots).toHaveLength(2);
+    expect(ballots[1]).toEqual({
+      messageId: 10,
+      userId: 2,
+      optionId: 11,
+    });
   });
 });

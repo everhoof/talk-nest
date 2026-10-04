@@ -48,6 +48,7 @@ type Mutation {
   createPoll(question: String!, allowMultiple: Boolean, allowChangeVote: Boolean, endsAt: DateTime, options: [String!]!): Message!
   updatePoll(question: String!, allowMultiple: Boolean, allowChangeVote: Boolean, endsAt: DateTime, messageId: Int!, options: [UpdatePollOptionInput!]!): Message!
   votePoll(messageId: Int!, optionIds: [Int!]!): Poll!
+  cancelPollVote(messageId: Int!): Poll!
   closePoll(messageId: Int!): Poll!
 }
 

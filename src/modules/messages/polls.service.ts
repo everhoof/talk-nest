@@ -116,6 +116,15 @@ export class PollsService {
     return this.getPoll(message.id, user);
   }
 
+  async cancelPollVote(messageId: number, user: User): Promise<Poll> {
+    const message = await this.votes.removeVote(messageId, user.id);
+    await this.pubSub.publish('messageUpdated', {
+      messageUpdated: message,
+    });
+
+    return this.getPoll(message.id, user);
+  }
+
   async closePoll(messageId: number, user: User): Promise<Poll> {
     if (!roles.can(user.roleNames).updateAny(RoleResources.POLL).granted) {
       throw new ForbiddenException('FORBIDDEN');

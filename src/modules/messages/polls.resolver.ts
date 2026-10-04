@@ -38,6 +38,12 @@ export class PollsResolver {
 
   @UseGuards(GqlAuthGuard)
   @Mutation(() => Poll)
+  cancelPollVote(@Args() args: GetPollArgs, @CurrentUser() user: User): Promise<Poll> {
+    return this.polls.cancelPollVote(args.messageId, user);
+  }
+
+  @UseGuards(GqlAuthGuard)
+  @Mutation(() => Poll)
   closePoll(@Args() args: GetPollArgs, @CurrentUser() user: User): Promise<Poll> {
     return this.polls.closePoll(args.messageId, user);
   }

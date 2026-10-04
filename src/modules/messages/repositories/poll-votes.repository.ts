@@ -1,6 +1,6 @@
 import { EntityRepository, In } from 'typeorm';
 import { BasicRepository } from '@modules/common/repositories/basic.repository';
-import { BadRequestException } from '@modules/common/exceptions/exceptions';
+import { BadRequestException, ForbiddenException } from '@modules/common/exceptions/exceptions';
 import { Message } from '../entities/messages.entity';
 import { MessagePollOption } from '../entities/poll-options.entity';
 import { PollVote } from '../entities/poll-votes.entity';
@@ -62,19 +62,38 @@ export class PollVotesRepository extends BasicRepository<PollVote> {
 
       const existingVotes = await manager.find(PollVote, { messageId, userId });
 
-      if (existingVotes.length && !poll.allowChangeVote) {
-        throw new BadRequestException('POLL_ALREADY_VOTED');
-      }
-
-      // Replace the whole ballot atomically so selections never accumulate on a revote.
       if (existingVotes.length) {
-        await manager.delete(PollVote, { messageId, userId });
+        throw new BadRequestException('POLL_ALREADY_VOTED');
       }
 
       await manager.insert(
         PollVote,
         optionIds.map((optionId) => ({ messageId, userId, optionId })),
       );
+
+      message.updatedAt = new Date();
+
+      return manager.save(Message, message);
+    });
+  }
+
+  async removeVote(messageId: number, userId: number): Promise<Message> {
+    return this.manager.transaction(async (manager) => {
+      const messages = manager.getCustomRepository(MessagesRepository);
+      const { message, poll } = await messages.getPollForUpdate(messageId);
+
+      if (poll.isClosed) {
+        throw new BadRequestException('POLL_CLOSED');
+      }
+
+      if (!poll.allowChangeVote) {
+        throw new ForbiddenException('FORBIDDEN');
+      }
+
+      await manager.delete(PollVote, {
+        messageId,
+        userId,
+      });
 
       message.updatedAt = new Date();
 
