@@ -4,6 +4,7 @@ import { MessagePoll } from '../entities/polls.entity';
 import { MessagePollOption } from '../entities/poll-options.entity';
 import { PollVote } from '../entities/poll-votes.entity';
 import { PollVotesRepository } from './poll-votes.repository';
+import { MessagesRepository } from './messages.repository';
 
 describe('PollVotesRepository without a database', () => {
   const manager = {
@@ -13,6 +14,7 @@ describe('PollVotesRepository without a database', () => {
     insert: jest.fn(),
     delete: jest.fn(),
     save: jest.fn(),
+    getCustomRepository: jest.fn(),
   };
   const repository = Object.assign(new PollVotesRepository(), { manager });
   let poll: MessagePoll;
@@ -29,6 +31,11 @@ describe('PollVotesRepository without a database', () => {
     });
     message = Object.assign(new Message(), { id: 10, type: MessageType.POLL, deletedAt: null });
     manager.transaction.mockImplementation((work) => work(manager));
+    manager.getCustomRepository.mockImplementation((repositoryType) => {
+      expect(repositoryType).toBe(MessagesRepository);
+
+      return Object.assign(new MessagesRepository(), { manager });
+    });
     manager.findOne.mockImplementation(async (entity) => {
       if (entity === Message) return message;
       if (entity === MessagePoll) return poll;
@@ -45,6 +52,20 @@ describe('PollVotesRepository without a database', () => {
     expect(manager.findOne).toHaveBeenCalledWith(Message, 10, { lock: { mode: 'pessimistic_write' } });
     expect(manager.findOne.mock.invocationCallOrder[0]).toBeLessThan(manager.insert.mock.invocationCallOrder[0]);
     expect(manager.insert).toHaveBeenCalledWith(PollVote, [{ messageId: 10, userId: 2, optionId: 11 }]);
+  });
+
+  it.each([
+    { name: 'missing message', message: undefined, poll: { messageId: 10 } },
+    { name: 'ordinary message', message: { type: MessageType.GENERAL }, poll: { messageId: 10 } },
+    { name: 'deleted message', message: { type: MessageType.POLL, deletedAt: new Date() }, poll: { messageId: 10 } },
+    { name: 'missing poll', message: { type: MessageType.POLL }, poll: undefined },
+  ])('rejects $name before writing votes', async (records) => {
+    manager.findOne.mockResolvedValueOnce(records.message).mockResolvedValueOnce(records.poll);
+
+    await expect(repository.addVote(10, 2, [11])).rejects.toMatchObject({ exception: 'MESSAGE_NOT_FOUND' });
+    expect(manager.insert).not.toHaveBeenCalled();
+    expect(manager.delete).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
   });
 
   it.each(['manual', 'deadline'])('rejects voting after %s closure', async (reason) => {

@@ -21,7 +21,10 @@ export class MessagePoll {
   closedAt: Date | null;
 
   get isClosed(): boolean {
-    if (this.closedAt) return true;
+    if (this.closedAt) {
+      return true;
+    }
+
     return !!this.endsAt && this.endsAt.getTime() <= Date.now();
   }
 }

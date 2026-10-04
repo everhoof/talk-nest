@@ -23,14 +23,18 @@ export class PollsService {
     if (!roles.can(user.roleNames).createOwn(RoleResources.POLL).granted) {
       throw new ForbiddenException('FORBIDDEN');
     }
+
     await this.messagesService.throwOnPunished(user.id);
+
     const options = this.prepareOptions(args.options);
     const message = await this.polls.createPoll(user, args.question.trim(), options, {
       allowMultiple: args.allowMultiple ?? false,
       allowChangeVote: args.allowChangeVote ?? false,
       endsAt: args.endsAt ?? null,
     });
+
     await this.pubSub.publish('messageCreated', { messageCreated: message });
+
     return message;
   }
 
@@ -38,7 +42,9 @@ export class PollsService {
     if (!roles.can(user.roleNames).updateAny(RoleResources.POLL).granted) {
       throw new ForbiddenException('FORBIDDEN');
     }
+
     await this.messagesService.throwOnPunished(user.id);
+
     const labels = this.prepareOptions(args.options.map((option) => option.label));
     const options = args.options.map((option, index) => ({ id: option.id, label: labels[index] }));
     const message = await this.polls.updatePoll(args.messageId, args.question.trim(), options, {
@@ -46,7 +52,9 @@ export class PollsService {
       allowChangeVote: args.allowChangeVote ?? undefined,
       endsAt: args.endsAt,
     });
+
     await this.pubSub.publish('messageUpdated', { messageUpdated: message });
+
     return message;
   }
 
@@ -54,7 +62,11 @@ export class PollsService {
     const labels = options.map((option) => option.trim());
     const normalizedOptions = labels.map((option) => option.toLowerCase());
     const hasDuplicateOptions = new Set(normalizedOptions).size !== normalizedOptions.length;
-    if (hasDuplicateOptions) throw new BadRequestException('POLL_INVALID');
+
+    if (hasDuplicateOptions) {
+      throw new BadRequestException('POLL_INVALID');
+    }
+
     return labels;
   }
 
@@ -63,6 +75,7 @@ export class PollsService {
       messageId,
       user?.id,
     );
+
     const poll: Poll = {
       messageId,
       question: record.question,
@@ -76,28 +89,43 @@ export class PollsService {
       totalVotes: null,
       options: options.map(({ id, label }) => ({ id, label, votes: null })),
     };
+
     // Active poll results stay private until the viewer votes; closed poll results are public.
-    if (!isClosed && !ownVotes.length) return poll;
-    if (ownVotes.length)
+    if (!isClosed && !ownVotes.length) {
+      return poll;
+    }
+
+    if (ownVotes.length) {
       poll.selectedOption = options.findIndex((option) => poll.selectedOptionIds.includes(option.id));
+    }
+
     poll.totalVotes = totalVotes;
     const votesByOption = new Map(counts.map((count) => [count.optionId, count.votes]));
+
     for (const option of poll.options) {
       option.votes = votesByOption.get(option.id) || 0;
     }
+
     return poll;
   }
 
   async votePoll(args: VotePollArgs, user: User): Promise<Poll> {
     const message = await this.votes.addVote(args.messageId, user.id, args.optionIds);
     await this.pubSub.publish('messageUpdated', { messageUpdated: message });
+
     return this.getPoll(message.id, user);
   }
+
   async closePoll(messageId: number, user: User): Promise<Poll> {
-    if (!roles.can(user.roleNames).updateAny(RoleResources.POLL).granted) throw new ForbiddenException('FORBIDDEN');
+    if (!roles.can(user.roleNames).updateAny(RoleResources.POLL).granted) {
+      throw new ForbiddenException('FORBIDDEN');
+    }
+
     await this.messagesService.throwOnPunished(user.id);
+
     const message = await this.polls.closePoll(messageId);
     await this.pubSub.publish('messageUpdated', { messageUpdated: message });
+
     return this.getPoll(message.id, user);
   }
 }

@@ -5,6 +5,7 @@ import { MessagePoll } from '../entities/polls.entity';
 import { MessagePollOption } from '../entities/poll-options.entity';
 import { PollVotesRepository } from './poll-votes.repository';
 import { PollsRepository } from './polls.repository';
+import { MessagesRepository } from './messages.repository';
 
 describe('PollsRepository without a database', () => {
   const votes = {
@@ -54,7 +55,15 @@ describe('PollsRepository without a database', () => {
     manager.find.mockResolvedValue(options);
     manager.create.mockImplementation((_entity, value) => value);
     manager.save.mockImplementation(async (_entity, value) => value);
-    manager.getCustomRepository.mockReturnValue(votes);
+    manager.getCustomRepository.mockImplementation((repositoryType) => {
+      if (repositoryType === MessagesRepository) {
+        return Object.assign(new MessagesRepository(), { manager });
+      }
+
+      expect(repositoryType).toBe(PollVotesRepository);
+
+      return votes;
+    });
     votes.find.mockResolvedValue([]);
     votes.getOptionCounts.mockResolvedValue([{ optionId: 11, votes: 1 }]);
     votes.getVoterCount.mockResolvedValue(1);
@@ -122,6 +131,8 @@ describe('PollsRepository without a database', () => {
     );
     expect(manager.update).toHaveBeenCalledWith(MessagePollOption, 12, { label: 'Джаз!', position: 0 });
     expect(manager.update).toHaveBeenCalledWith(MessagePollOption, 11, { label: 'Рок!', position: 1 });
+    expect(manager.findOne).toHaveBeenCalledWith(Message, 10, { lock: { mode: 'pessimistic_write' } });
+    expect(manager.findOne.mock.invocationCallOrder[0]).toBeLessThan(manager.update.mock.invocationCallOrder[0]);
     expect(manager.delete).not.toHaveBeenCalled();
     expect(manager.insert).not.toHaveBeenCalled();
   });
@@ -207,6 +218,22 @@ describe('PollsRepository without a database', () => {
     poll.closedAt = new Date();
     await repository.closePoll(10);
     expect(manager.update).not.toHaveBeenCalled();
+  });
+
+  it.each(['update', 'close'])('rejects a deleted poll on %s before writing changes', async (operation) => {
+    message.deletedAt = new Date();
+    let action: Promise<Message>;
+
+    if (operation === 'update') {
+      action = repository.updatePoll(10, 'Тема', options, {});
+    } else {
+      action = repository.closePoll(10);
+    }
+
+    await expect(action).rejects.toMatchObject({ exception: 'MESSAGE_NOT_FOUND' });
+    expect(manager.update).not.toHaveBeenCalled();
+    expect(manager.delete).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
   });
 });
 

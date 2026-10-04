@@ -1,20 +1,22 @@
 import { EntityRepository, In } from 'typeorm';
 import { BasicRepository } from '@modules/common/repositories/basic.repository';
 import { BadRequestException } from '@modules/common/exceptions/exceptions';
-import { Message, MessageType } from '../entities/messages.entity';
-import { MessagePoll } from '../entities/polls.entity';
+import { Message } from '../entities/messages.entity';
 import { MessagePollOption } from '../entities/poll-options.entity';
 import { PollVote } from '../entities/poll-votes.entity';
+import type { PollOptionCount } from '../types/poll-option-count';
+import { MessagesRepository } from './messages.repository';
 
 @EntityRepository(PollVote)
 export class PollVotesRepository extends BasicRepository<PollVote> {
-  async getOptionCounts(messageId: number): Promise<{ optionId: number; votes: number }[]> {
+  async getOptionCounts(messageId: number): Promise<PollOptionCount[]> {
     const counts = await this.createQueryBuilder('vote')
       .select('vote.optionId', 'optionId')
       .addSelect('COUNT(*)', 'votes')
       .where({ messageId })
       .groupBy('vote.optionId')
       .getRawMany<{ optionId: number; votes: string }>();
+
     return counts.map((count) => ({ optionId: count.optionId, votes: Number(count.votes) }));
   }
 
@@ -23,6 +25,7 @@ export class PollVotesRepository extends BasicRepository<PollVote> {
       .select('COUNT(DISTINCT vote.userId)', 'count')
       .where({ messageId })
       .getRawOne<{ count: string }>();
+
     return Number(result.count);
   }
 
@@ -34,29 +37,47 @@ export class PollVotesRepository extends BasicRepository<PollVote> {
       .having('COUNT(*) > 1')
       .limit(1)
       .getRawOne();
+
     return !!result;
   }
 
   async addVote(messageId: number, userId: number, optionIds: number[]): Promise<Message> {
     return this.manager.transaction(async (manager) => {
-      const message = await manager.findOne(Message, messageId, { lock: { mode: 'pessimistic_write' } });
-      const poll = await manager.findOne(MessagePoll, { messageId });
-      if (!message || message.type !== MessageType.POLL || message.deletedAt || !poll) {
-        throw new BadRequestException('MESSAGE_NOT_FOUND');
+      const messages = manager.getCustomRepository(MessagesRepository);
+      const { message, poll } = await messages.getPollForUpdate(messageId);
+
+      if (poll.isClosed) {
+        throw new BadRequestException('POLL_CLOSED');
       }
-      if (poll.isClosed) throw new BadRequestException('POLL_CLOSED');
-      if (!poll.allowMultiple && optionIds.length > 1) throw new BadRequestException('POLL_INVALID');
+
+      if (!poll.allowMultiple && optionIds.length > 1) {
+        throw new BadRequestException('POLL_INVALID');
+      }
+
       const options = await manager.find(MessagePollOption, { id: In(optionIds), messageId });
-      if (options.length !== optionIds.length) throw new BadRequestException('POLL_INVALID');
+
+      if (options.length !== optionIds.length) {
+        throw new BadRequestException('POLL_INVALID');
+      }
+
       const existingVotes = await manager.find(PollVote, { messageId, userId });
-      if (existingVotes.length && !poll.allowChangeVote) throw new BadRequestException('POLL_ALREADY_VOTED');
+
+      if (existingVotes.length && !poll.allowChangeVote) {
+        throw new BadRequestException('POLL_ALREADY_VOTED');
+      }
+
       // Replace the whole ballot atomically so selections never accumulate on a revote.
-      if (existingVotes.length) await manager.delete(PollVote, { messageId, userId });
+      if (existingVotes.length) {
+        await manager.delete(PollVote, { messageId, userId });
+      }
+
       await manager.insert(
         PollVote,
         optionIds.map((optionId) => ({ messageId, userId, optionId })),
       );
+
       message.updatedAt = new Date();
+
       return manager.save(Message, message);
     });
   }
