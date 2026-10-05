@@ -1,16 +1,25 @@
-import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
 import { UseFilters, UseGuards } from '@nestjs/common';
 import { GraphqlExceptionFilter } from '@modules/common/filters/http-exception.filter';
 import { CurrentUser, GqlAuthGuard, OptionalGqlAuthGuard } from '@modules/common/guards/auth.guard';
 import { User } from '@modules/users/entities/users.entity';
-import { Message } from './entities/messages.entity';
+import { Message, MessageType } from './entities/messages.entity';
 import { CreatePollArgs, GetPollArgs, Poll, UpdatePollArgs, VotePollArgs } from './polls.types';
 import { PollsService } from './polls.service';
 
 @UseFilters(GraphqlExceptionFilter)
-@Resolver()
+@Resolver(() => Message)
 export class PollsResolver {
   constructor(private readonly polls: PollsService) {}
+
+  @ResolveField(() => Poll, { nullable: true })
+  async poll(@Parent() message: Message, @CurrentUser() user?: User): Promise<Poll | null> {
+    if (message.type !== MessageType.POLL || message.deletedAt) {
+      return null;
+    }
+
+    return this.polls.getPoll(message.id, user);
+  }
 
   @UseGuards(GqlAuthGuard)
   @Mutation(() => Message)

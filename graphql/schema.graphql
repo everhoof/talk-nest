@@ -24,6 +24,7 @@ type Message {
   owner: User
   pictures: [Picture!]!
   deletedBy: User
+  poll: Poll
 }
 
 type Mutation {
