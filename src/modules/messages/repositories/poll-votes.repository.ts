@@ -66,9 +66,10 @@ export class PollVotesRepository extends BasicRepository<PollVote> {
         throw new BadRequestException('POLL_ALREADY_VOTED');
       }
 
+      const votedAt = new Date();
       await manager.insert(
         PollVote,
-        optionIds.map((optionId) => ({ messageId, userId, optionId })),
+        optionIds.map((optionId) => ({ messageId, userId, optionId, votedAt })),
       );
 
       message.updatedAt = new Date();

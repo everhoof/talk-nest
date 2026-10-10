@@ -51,7 +51,9 @@ describe('PollVotesRepository without a database', () => {
     expect(await repository.addVote(10, 2, [11])).toBe(message);
     expect(manager.findOne).toHaveBeenCalledWith(Message, 10, { lock: { mode: 'pessimistic_write' } });
     expect(manager.findOne.mock.invocationCallOrder[0]).toBeLessThan(manager.insert.mock.invocationCallOrder[0]);
-    expect(manager.insert).toHaveBeenCalledWith(PollVote, [{ messageId: 10, userId: 2, optionId: 11 }]);
+    expect(manager.insert).toHaveBeenCalledWith(PollVote, [
+      { messageId: 10, userId: 2, optionId: 11, votedAt: expect.any(Date) },
+    ]);
   });
 
   it.each([
@@ -86,9 +88,11 @@ describe('PollVotesRepository without a database', () => {
     manager.find.mockResolvedValueOnce([{ id: 11 }, { id: 12 }]).mockResolvedValueOnce([]);
     await repository.addVote(10, 2, [11, 12]);
     expect(manager.insert).toHaveBeenCalledWith(PollVote, [
-      { messageId: 10, userId: 2, optionId: 11 },
-      { messageId: 10, userId: 2, optionId: 12 },
+      { messageId: 10, userId: 2, optionId: 11, votedAt: expect.any(Date) },
+      { messageId: 10, userId: 2, optionId: 12, votedAt: expect.any(Date) },
     ]);
+    const ballot = manager.insert.mock.calls[0][1];
+    expect(ballot[0].votedAt).toEqual(ballot[1].votedAt);
   });
 
   it('rejects an option outside this poll without deleting the existing ballot', async () => {
@@ -210,6 +214,7 @@ describe('PollVotesRepository without a database', () => {
       messageId: 10,
       userId: 2,
       optionId: 11,
+      votedAt: expect.any(Date),
     });
   });
 });

@@ -59,6 +59,12 @@ export class CreatePollVotes1791028800000 implements MigrationInterface {
           { name: 'message_id', type: 'int' },
           { name: 'user_id', type: 'int' },
           { name: 'option_id', type: 'int' },
+          {
+            name: 'voted_at',
+            type: 'timestamp with time zone',
+            isNullable: true,
+            default: 'CURRENT_TIMESTAMP',
+          },
         ],
       }),
     );
