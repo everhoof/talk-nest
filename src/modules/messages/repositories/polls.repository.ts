@@ -35,13 +35,11 @@ export class PollsRepository extends BasicRepository<MessagePoll> {
         }),
       );
 
-      await manager.insert(
-        MessagePoll,
-        {
-          messageId: message.id,
-          question, ...settings 
-        }
-      );
+      await manager.insert(MessagePoll, {
+        messageId: message.id,
+        question,
+        ...settings,
+      });
       await manager.insert(
         MessagePollOption,
         labels.map((label, position) => ({ messageId: message.id, label, position })),
@@ -73,7 +71,7 @@ export class PollsRepository extends BasicRepository<MessagePoll> {
           position: 'ASC',
         },
       });
-      
+
       const votes = manager.getCustomRepository(PollVotesRepository);
       let ownVotes: PollVote[] = [];
       const isClosed = poll.isClosed;
