@@ -10,6 +10,7 @@ export class CreatePollVotes1791028800000 implements MigrationInterface {
         columns: [
           { name: 'message_id', type: 'int', isPrimary: true },
           { name: 'question', type: 'varchar', length: '300' },
+          { name: 'is_anonymous', type: 'boolean', default: false },
           { name: 'allow_multiple', type: 'boolean', default: false },
           { name: 'allow_change_vote', type: 'boolean', default: false },
           { name: 'ends_at', type: 'timestamp with time zone', isNullable: true },

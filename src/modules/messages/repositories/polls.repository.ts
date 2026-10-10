@@ -12,7 +12,8 @@ import type { PollOptionCount } from '../types/poll-option-count';
 import { PollVotesRepository } from './poll-votes.repository';
 import { MessagesRepository } from './messages.repository';
 
-type PollSettings = Pick<MessagePoll, 'allowMultiple' | 'allowChangeVote' | 'endsAt'>;
+type PollSettings = Pick<MessagePoll, 'allowMultiple' | 'allowChangeVote' | 'endsAt'> & { isAnonymous?: boolean };
+type PollEditableSettings = Pick<MessagePoll, 'allowMultiple' | 'allowChangeVote' | 'endsAt'>;
 
 @EntityRepository(MessagePoll)
 export class PollsRepository extends BasicRepository<MessagePoll> {
@@ -96,7 +97,7 @@ export class PollsRepository extends BasicRepository<MessagePoll> {
     messageId: number,
     question: string,
     options: { id?: number | null; label: string }[],
-    settings: Partial<PollSettings>,
+    settings: Partial<PollEditableSettings>,
   ): Promise<Message> {
     return this.manager.transaction(async (manager) => {
       const messages = manager.getCustomRepository(MessagesRepository);
@@ -184,7 +185,7 @@ export class PollsRepository extends BasicRepository<MessagePoll> {
   private async applySettings(
     manager: EntityManager,
     poll: MessagePoll,
-    settings: Partial<PollSettings>,
+    settings: Partial<PollEditableSettings>,
   ): Promise<void> {
     if (poll.allowMultiple && settings.allowMultiple === false) {
       const votes = manager.getCustomRepository(PollVotesRepository);

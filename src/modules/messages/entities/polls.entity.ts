@@ -8,6 +8,9 @@ export class MessagePoll {
   @Column({ type: 'varchar', length: 300 })
   question: string;
 
+  @Column({ name: 'is_anonymous', type: 'boolean', default: false })
+  isAnonymous: boolean;
+
   @Column({ name: 'allow_multiple', type: 'boolean', default: false })
   allowMultiple: boolean;
 

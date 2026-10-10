@@ -235,6 +235,11 @@ describe('PollsRepository without a database', () => {
     expect(manager.delete).not.toHaveBeenCalled();
     expect(manager.save).not.toHaveBeenCalled();
   });
+  it('ignores attempts to change anonymity through editing settings', async () => {
+    poll.isAnonymous = true;
+    await repository.updatePoll(10, 'Тема', options, { isAnonymous: false } as any);
+    expect(poll.isAnonymous).toBe(true);
+  });
 });
 
 describe('Poll deadline', () => {

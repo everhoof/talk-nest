@@ -85,7 +85,12 @@ describe('Poll argument validation', () => {
   });
 
   it('rejects invalid poll setting types', async () => {
-    for (const settings of [{ allowMultiple: 'yes' }, { allowChangeVote: 1 }, { endsAt: 'invalid' }]) {
+    for (const settings of [
+      { isAnonymous: 'yes' },
+      { allowMultiple: 'yes' },
+      { allowChangeVote: 1 },
+      { endsAt: 'invalid' },
+    ]) {
       await expect(
         pipe.transform({ question, options: ['Рок'], ...settings }, { type: 'body', metatype: CreatePollArgs }),
       ).rejects.toBeInstanceOf(BadRequestException);

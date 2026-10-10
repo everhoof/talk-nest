@@ -28,6 +28,7 @@ export class PollsService {
 
     const options = this.prepareOptions(args.options);
     const message = await this.polls.createPoll(user, args.question.trim(), options, {
+      isAnonymous: args.isAnonymous ?? false,
       allowMultiple: args.allowMultiple ?? false,
       allowChangeVote: args.allowChangeVote ?? false,
       endsAt: args.endsAt ?? null,
@@ -78,6 +79,7 @@ export class PollsService {
 
     const poll: Poll = {
       messageId,
+      isAnonymous: record.isAnonymous ?? false,
       question: record.question,
       allowMultiple: record.allowMultiple,
       allowChangeVote: record.allowChangeVote,

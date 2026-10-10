@@ -46,7 +46,7 @@ type Mutation {
   invalidateCurrentToken: Boolean!
   invalidateTokenById(id: Int!): Boolean!
   invalidateAllTokens: Boolean!
-  createPoll(question: String!, allowMultiple: Boolean, allowChangeVote: Boolean, endsAt: DateTime, options: [String!]!): Message!
+  createPoll(question: String!, allowMultiple: Boolean, allowChangeVote: Boolean, endsAt: DateTime, isAnonymous: Boolean, options: [String!]!): Message!
   updatePoll(question: String!, allowMultiple: Boolean, allowChangeVote: Boolean, endsAt: DateTime, messageId: Int!, options: [UpdatePollOptionInput!]!): Message!
   votePoll(messageId: Int!, optionIds: [Int!]!): Poll!
   cancelPollVote(messageId: Int!): Poll!
@@ -77,6 +77,7 @@ type PictureRepresentation {
 }
 
 type Poll {
+  isAnonymous: Boolean!
   messageId: Int!
   question: String!
   allowMultiple: Boolean!

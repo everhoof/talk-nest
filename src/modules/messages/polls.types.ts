@@ -42,6 +42,11 @@ class PollQuestionArgs {
 
 @ArgsType()
 export class CreatePollArgs extends PollQuestionArgs {
+  @Field(() => Boolean, { nullable: true })
+  @IsOptional()
+  @IsBoolean()
+  isAnonymous?: boolean | null;
+
   @Field(() => [String])
   @IsArray()
   @ArrayMinSize(1)
@@ -117,6 +122,9 @@ export class PollOption {
 
 @ObjectType()
 export class Poll {
+  @Field()
+  isAnonymous: boolean;
+
   @Field(() => Int)
   messageId: number;
 

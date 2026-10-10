@@ -27,7 +27,7 @@ describe('PollsService', () => {
     jest.resetAllMocks();
     polls.createPoll.mockResolvedValue({ id: 10 });
     polls.getPollData.mockResolvedValue({
-      poll: { question: 'Что послушаем?', allowMultiple: false, allowChangeVote: false, endsAt: null },
+      poll: { isAnonymous: false, question: 'Что послушаем?', allowMultiple: false, allowChangeVote: false, endsAt: null },
       options: [
         { id: 11, label: 'Рок' },
         { id: 12, label: 'Джаз' },
@@ -43,6 +43,7 @@ describe('PollsService', () => {
     const creator = Object.assign(new User(), { id: 2, username: 'host', roles: [{ name: role }] });
     const message = await service.createPoll({ question: '  Тема  ', options: ['  Рок  '] }, creator);
     expect(polls.createPoll).toHaveBeenCalledWith(creator, 'Тема', ['Рок'], {
+      isAnonymous: false,
       allowMultiple: false,
       allowChangeVote: false,
       endsAt: null,
@@ -68,7 +69,12 @@ describe('PollsService', () => {
 
   it('passes explicit creation settings to the repository', async () => {
     const creator = Object.assign(new User(), { id: 2, roles: [{ name: AppRoles.BROADCASTER }] });
-    const settings = { allowMultiple: true, allowChangeVote: true, endsAt: new Date('2030-01-01T12:00:00Z') };
+    const settings = {
+      isAnonymous: true,
+      allowMultiple: true,
+      allowChangeVote: true,
+      endsAt: new Date('2030-01-01T12:00:00Z'),
+    };
     await service.createPoll({ question: 'Тема', options: ['Рок'], ...settings }, creator);
     expect(polls.createPoll).toHaveBeenCalledWith(creator, 'Тема', ['Рок'], settings);
   });
