@@ -72,14 +72,18 @@ export class PollsService {
   }
 
   async getPoll(messageId: number, user?: User): Promise<Poll> {
-    const { poll: record, options, ownVotes, counts, isClosed, totalVotes } = await this.polls.getPollData(
+    const canManage = !!user && roles.can(user.roleNames).updateAny(RoleResources.POLL).granted;
+    const { poll: record, options, ownVotes, counts, isClosed, totalVotes, voters } = await this.polls.getPollData(
       messageId,
       user?.id,
+      canManage,
     );
 
     const poll: Poll = {
       messageId,
       isAnonymous: record.isAnonymous ?? false,
+      closedAt: record.closedAt ?? null,
+      voters: canManage && !record.isAnonymous ? voters : [],
       question: record.question,
       allowMultiple: record.allowMultiple,
       allowChangeVote: record.allowChangeVote,
@@ -92,8 +96,8 @@ export class PollsService {
       options: options.map(({ id, label }) => ({ id, label, votes: null })),
     };
 
-    // Active poll results stay private until the viewer votes; closed poll results are public.
-    if (!isClosed && !ownVotes.length) {
+    // Moderators can preview aggregates; other viewers see results after voting or closure.
+    if (!isClosed && !ownVotes.length && !canManage) {
       return poll;
     }
 

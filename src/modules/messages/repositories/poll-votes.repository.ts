@@ -1,4 +1,5 @@
 import { EntityRepository, In } from 'typeorm';
+import type { PollVoter } from '../polls.types';
 import { BasicRepository } from '@modules/common/repositories/basic.repository';
 import { BadRequestException, ForbiddenException } from '@modules/common/exceptions/exceptions';
 import { Message } from '../entities/messages.entity';
@@ -27,6 +28,39 @@ export class PollVotesRepository extends BasicRepository<PollVote> {
       .getRawOne<{ count: string }>();
 
     return Number(result.count);
+  }
+
+  async getVoters(messageId: number): Promise<PollVoter[]> {
+    const votes = await this.find({
+      where: { messageId },
+      relations: ['user', 'user.avatar', 'user.avatar.s'],
+      loadEagerRelations: false,
+    });
+
+    votes.sort((a, b) => {
+      const firstTime = a.votedAt?.getTime() ?? -Infinity;
+      const secondTime = b.votedAt?.getTime() ?? -Infinity;
+      return firstTime - secondTime || a.userId - b.userId;
+    });
+
+    const voters = new Map<number, PollVoter>();
+    for (const { userId, user, votedAt, optionId } of votes) {
+      if (!user) continue;
+
+      let voter = voters.get(userId);
+      if (!voter) {
+        voter = {
+          id: userId,
+          username: user.username || String(userId),
+          avatarUrl: user.avatar?.s?.link ?? null,
+          votedAt,
+          optionIds: [],
+        };
+        voters.set(userId, voter);
+      }
+      voter.optionIds.push(optionId);
+    }
+    return [...voters.values()];
   }
 
   async hasMultipleSelections(messageId: number): Promise<boolean> {

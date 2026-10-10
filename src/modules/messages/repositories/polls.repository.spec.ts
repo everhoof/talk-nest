@@ -12,6 +12,7 @@ describe('PollsRepository without a database', () => {
     find: jest.fn(),
     getOptionCounts: jest.fn(),
     getVoterCount: jest.fn(),
+    getVoters: jest.fn(),
     hasMultipleSelections: jest.fn(),
   };
   const manager = {
@@ -65,6 +66,7 @@ describe('PollsRepository without a database', () => {
       return votes;
     });
     votes.find.mockResolvedValue([]);
+    votes.getVoters.mockResolvedValue([]);
     votes.getOptionCounts.mockResolvedValue([{ optionId: 11, votes: 1 }]);
     votes.getVoterCount.mockResolvedValue(1);
     votes.hasMultipleSelections.mockResolvedValue(false);
@@ -235,6 +237,27 @@ describe('PollsRepository without a database', () => {
     expect(manager.delete).not.toHaveBeenCalled();
     expect(manager.save).not.toHaveBeenCalled();
   });
+  it('loads moderator aggregates and voter details without requiring their vote', async () => {
+    await repository.getPollData(10, 2, true);
+    expect(votes.getOptionCounts).toHaveBeenCalledWith(10);
+    expect(votes.getVoterCount).toHaveBeenCalledWith(10);
+    expect(votes.getVoters).toHaveBeenCalledWith(10);
+  });
+
+  it('does not query identities for anonymous polls, even for moderators', async () => {
+    poll.isAnonymous = true;
+    await repository.getPollData(10, 2, true);
+    expect(votes.getVoterCount).toHaveBeenCalledWith(10);
+    expect(votes.getVoters).not.toHaveBeenCalled();
+  });
+
+  it('does not query identities for ordinary viewers or guests after closure', async () => {
+    poll.closedAt = new Date();
+    await repository.getPollData(10, 2);
+    await repository.getPollData(10);
+    expect(votes.getVoters).not.toHaveBeenCalled();
+  });
+
   it('ignores attempts to change anonymity through editing settings', async () => {
     poll.isAnonymous = true;
     await repository.updatePoll(10, 'Тема', options, { isAnonymous: false } as any);

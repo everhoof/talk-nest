@@ -51,7 +51,7 @@ export class PollsRepository extends BasicRepository<MessagePoll> {
     });
   }
 
-  async getPollData(messageId: number, userId?: number): Promise<PollData> {
+  async getPollData(messageId: number, userId?: number, canManage = false): Promise<PollData> {
     return this.manager.transaction('REPEATABLE READ', async (manager) => {
       const message = await manager.findOne(Message, {
         where: {
@@ -84,12 +84,14 @@ export class PollsRepository extends BasicRepository<MessagePoll> {
         ownVotes = await votes.find({ messageId, userId });
       }
 
-      if (ownVotes.length || isClosed) {
+      if (ownVotes.length || isClosed || canManage) {
         counts = await votes.getOptionCounts(messageId);
         totalVotes = await votes.getVoterCount(messageId);
       }
 
-      return { poll, options, ownVotes, counts, isClosed, totalVotes };
+      const voters = canManage && !poll.isAnonymous ? await votes.getVoters(messageId) : [];
+
+      return { poll, options, ownVotes, counts, isClosed, totalVotes, voters };
     });
   }
 

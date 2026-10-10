@@ -47,6 +47,78 @@ describe('PollVotesRepository without a database', () => {
     manager.save.mockImplementation(async (_entity, value) => value);
   });
 
+  describe('getVoters', () => {
+    let findVotes: jest.SpyInstance;
+
+    beforeEach(() => {
+      findVotes = jest.spyOn(repository, 'find');
+    });
+
+    afterEach(() => {
+      findVotes.mockRestore();
+    });
+
+    it('groups every selected option into one public voter with the resolved avatar URL', async () => {
+      const votedAt = new Date('2026-10-06T12:00:00Z');
+      const user = {
+        id: 2,
+        username: 'Listener',
+        email: 'private@example.invalid',
+        avatar: { s: { link: 'https://cdn.example/avatar.png' } },
+      };
+      findVotes.mockResolvedValue([
+        { userId: 2, user, optionId: 11, votedAt },
+        { userId: 2, user, optionId: 12, votedAt },
+      ]);
+
+      expect(await repository.getVoters(10)).toEqual([
+        {
+          id: 2,
+          username: 'Listener',
+          avatarUrl: 'https://cdn.example/avatar.png',
+          votedAt,
+          optionIds: [11, 12],
+        },
+      ]);
+    });
+
+    it('keeps legacy votes first, then orders by vote time and user ID', async () => {
+      const earlier = new Date('2026-10-06T12:00:00Z');
+      const later = new Date('2026-10-06T13:00:00Z');
+      findVotes.mockResolvedValue(
+        [
+          { userId: 3, votedAt: later },
+          { userId: 6, votedAt: earlier },
+          { userId: 5, votedAt: null },
+          { userId: 4, votedAt: earlier },
+          { userId: 2, votedAt: null },
+        ].map((vote) => ({ ...vote, optionId: 11, user: { username: `Listener ${vote.userId}` } })),
+      );
+
+      const voters = await repository.getVoters(10);
+      expect(voters.map(({ id }) => id)).toEqual([2, 5, 4, 6, 3]);
+      expect(voters[0].votedAt).toBeNull();
+    });
+
+    it('handles missing names, avatars, and deleted users', async () => {
+      findVotes.mockResolvedValue([
+        { userId: 2, user: { username: null, avatar: null }, optionId: 11, votedAt: null },
+        { userId: 3, user: { username: 'Listener', avatar: { s: null } }, optionId: 12, votedAt: null },
+        { userId: 4, user: null, optionId: 11, votedAt: null },
+      ]);
+
+      expect(await repository.getVoters(10)).toEqual([
+        { id: 2, username: '2', avatarUrl: null, votedAt: null, optionIds: [11] },
+        { id: 3, username: 'Listener', avatarUrl: null, votedAt: null, optionIds: [12] },
+      ]);
+    });
+
+    it('returns no voters for an empty poll', async () => {
+      findVotes.mockResolvedValue([]);
+      expect(await repository.getVoters(10)).toEqual([]);
+    });
+  });
+
   it('locks the poll message before writing a ballot', async () => {
     expect(await repository.addVote(10, 2, [11])).toBe(message);
     expect(manager.findOne).toHaveBeenCalledWith(Message, 10, { lock: { mode: 'pessimistic_write' } });

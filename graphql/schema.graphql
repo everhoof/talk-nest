@@ -78,6 +78,8 @@ type PictureRepresentation {
 
 type Poll {
   isAnonymous: Boolean!
+  closedAt: DateTime
+  voters: [PollVoter!]!
   messageId: Int!
   question: String!
   allowMultiple: Boolean!
@@ -95,6 +97,14 @@ type PollOption {
   id: Int!
   label: String!
   votes: Int
+}
+
+type PollVoter {
+  id: Int!
+  username: String!
+  avatarUrl: String
+  votedAt: DateTime
+  optionIds: [Int!]!
 }
 
 enum PunishmentTypes {

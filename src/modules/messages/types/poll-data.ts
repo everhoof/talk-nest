@@ -1,3 +1,4 @@
+import type { PollVoter } from '../polls.types';
 import type { MessagePoll } from '../entities/polls.entity';
 import type { MessagePollOption } from '../entities/poll-options.entity';
 import type { PollVote } from '../entities/poll-votes.entity';
@@ -10,4 +11,5 @@ export interface PollData {
   isClosed: boolean;
   totalVotes: number | null;
   counts: PollOptionCount[];
+  voters: PollVoter[];
 }

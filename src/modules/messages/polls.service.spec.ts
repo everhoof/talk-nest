@@ -27,7 +27,14 @@ describe('PollsService', () => {
     jest.resetAllMocks();
     polls.createPoll.mockResolvedValue({ id: 10 });
     polls.getPollData.mockResolvedValue({
-      poll: { isAnonymous: false, question: 'Что послушаем?', allowMultiple: false, allowChangeVote: false, endsAt: null },
+      poll: {
+        isAnonymous: false,
+        closedAt: null,
+        question: 'Что послушаем?',
+        allowMultiple: false,
+        allowChangeVote: false,
+        endsAt: null,
+      },
       options: [
         { id: 11, label: 'Рок' },
         { id: 12, label: 'Джаз' },
@@ -36,6 +43,7 @@ describe('PollsService', () => {
       isClosed: false,
       totalVotes: null,
       counts: [],
+      voters: [],
     });
   });
 
@@ -85,7 +93,7 @@ describe('PollsService', () => {
       totalVotes: null,
       options: [{ votes: null }, { votes: null }],
     });
-    expect(polls.getPollData).toHaveBeenCalledWith(10, undefined);
+    expect(polls.getPollData).toHaveBeenCalledWith(10, undefined, false);
   });
 
   it('hides results from signed-in users who have not voted', async () => {
@@ -130,7 +138,7 @@ describe('PollsService', () => {
     expect(pubSub.publish).toHaveBeenCalledWith('messageUpdated', {
       messageUpdated: message,
     });
-    expect(polls.getPollData).toHaveBeenCalledWith(10, user.id);
+    expect(polls.getPollData).toHaveBeenCalledWith(10, user.id, false);
     expect(result.selectedOptionIds).toEqual([]);
     expect(result.totalVotes).toBeNull();
     expect(result.options.every((option) => option.votes === null)).toBe(true);
@@ -252,5 +260,61 @@ describe('PollsService', () => {
     await service.closePoll(10, creator);
     expect(polls.closePoll).toHaveBeenCalledWith(10);
     expect(pubSub.publish).toHaveBeenCalledWith('messageUpdated', { messageUpdated: { id: 10 } });
+  });
+  it.each([AppRoles.MODERATOR, AppRoles.BROADCASTER, AppRoles.ADMIN])(
+    'lets %s preview results and named voters before voting',
+    async (role) => {
+      const viewer = Object.assign(new User(), { id: 2, roles: [{ name: role }] });
+      const data = await polls.getPollData();
+      const voters = [{ id: 1, username: 'listener', avatarUrl: null, votedAt: new Date(), optionIds: [11, 12] }];
+      polls.getPollData.mockResolvedValue({
+        ...data,
+        totalVotes: 1,
+        counts: [
+          { optionId: 11, votes: 1 },
+          { optionId: 12, votes: 1 },
+        ],
+        voters,
+      });
+      expect(await service.getPoll(10, viewer)).toMatchObject({
+        totalVotes: 1,
+        voters,
+        selectedOptionIds: [],
+        options: [{ votes: 1 }, { votes: 1 }],
+      });
+      expect(polls.getPollData).toHaveBeenLastCalledWith(10, viewer.id, true);
+    },
+  );
+
+  it.each([true, false])('never exposes identities to ordinary viewers, anonymous=%s', async (isAnonymous) => {
+    const data = await polls.getPollData();
+    polls.getPollData.mockResolvedValue({
+      ...data,
+      poll: { ...data.poll, isAnonymous },
+      isClosed: true,
+      totalVotes: 1,
+      voters: [{ id: 99, username: 'private', optionIds: [11] }],
+    });
+    expect((await service.getPoll(10, user)).voters).toEqual([]);
+    expect((await service.getPoll(10)).voters).toEqual([]);
+  });
+
+  it('never exposes anonymous identities to moderators, even if a repository returns them', async () => {
+    const viewer = Object.assign(new User(), { id: 2, roles: [{ name: AppRoles.MODERATOR }] });
+    const data = await polls.getPollData();
+    polls.getPollData.mockResolvedValue({
+      ...data,
+      poll: { ...data.poll, isAnonymous: true },
+      totalVotes: 1,
+      voters: [{ id: 99, username: 'private', optionIds: [11] }],
+    });
+    expect(await service.getPoll(10, viewer)).toMatchObject({ isAnonymous: true, totalVotes: 1, voters: [] });
+  });
+
+  it('preserves the actual manual finish time in the API response', async () => {
+    const data = await polls.getPollData();
+    const closedAt = new Date();
+    polls.getPollData.mockResolvedValue({ ...data, poll: { ...data.poll, closedAt }, isClosed: true });
+    expect((await service.getPoll(10)).closedAt).toEqual(closedAt);
   });
 });

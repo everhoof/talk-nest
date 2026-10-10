@@ -121,9 +121,33 @@ export class PollOption {
 }
 
 @ObjectType()
+export class PollVoter {
+  @Field(() => Int)
+  id: number;
+
+  @Field()
+  username: string;
+
+  @Field(() => String, { nullable: true })
+  avatarUrl: string | null;
+
+  @Field(() => Date, { nullable: true })
+  votedAt: Date | null;
+
+  @Field(() => [Int])
+  optionIds: number[];
+}
+
+@ObjectType()
 export class Poll {
   @Field()
   isAnonymous: boolean;
+
+  @Field(() => Date, { nullable: true })
+  closedAt: Date | null;
+
+  @Field(() => [PollVoter])
+  voters: PollVoter[];
 
   @Field(() => Int)
   messageId: number;
