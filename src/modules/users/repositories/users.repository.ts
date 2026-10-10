@@ -69,7 +69,7 @@ export class UsersRepository extends BasicRepository<User> {
       return this.find({
         where: { username: ILike(`%${query}%`) },
         take: 10,
-      })
+      });
     }
 
     return this.find({

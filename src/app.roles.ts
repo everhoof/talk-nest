@@ -9,6 +9,7 @@ export enum AppRoles {
 }
 
 export enum RoleResources {
+  POLL = 'poll',
   MESSAGE = 'message',
   DELETED_MESSAGE = 'deleted-message',
   MUTE = 'mute',
@@ -27,10 +28,16 @@ roles.grant(AppRoles.USER).extend(AppRoles.UNVERIFIED_USER);
 roles
   .grant(AppRoles.MODERATOR)
   .extend(AppRoles.USER)
+  .createOwn(RoleResources.POLL)
+  .updateAny(RoleResources.POLL)
   .read(RoleResources.DELETED_MESSAGE)
   .readAny(RoleResources.MESSAGE)
   .deleteAny(RoleResources.MESSAGE)
   .update(RoleResources.MUTE)
   .readAny(RoleResources.USER_SETTINGS);
 roles.grant(AppRoles.ADMIN).extend(AppRoles.MODERATOR).update(RoleResources.BAN);
-roles.grant(AppRoles.BROADCASTER).extend(AppRoles.UNVERIFIED_USER);
+roles
+  .grant(AppRoles.BROADCASTER)
+  .extend(AppRoles.UNVERIFIED_USER)
+  .createOwn(RoleResources.POLL)
+  .updateAny(RoleResources.POLL);

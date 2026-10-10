@@ -21,6 +21,7 @@ export enum MessageSchema {
   LOGIN = '1',
   LOGOUT = '1',
   DONATION = '2',
+  POLL = '3',
 }
 
 export enum MessageType {
@@ -29,6 +30,7 @@ export enum MessageType {
   LOGIN = 3,
   LOGOUT = 4,
   DONATION = 5,
+  POLL = 6,
 }
 
 @ObjectType()

@@ -24,6 +24,7 @@ type Message {
   owner: User
   pictures: [Picture!]!
   deletedBy: User
+  poll: Poll
 }
 
 type Mutation {
@@ -45,6 +46,11 @@ type Mutation {
   invalidateCurrentToken: Boolean!
   invalidateTokenById(id: Int!): Boolean!
   invalidateAllTokens: Boolean!
+  createPoll(question: String!, allowMultiple: Boolean, allowChangeVote: Boolean, endsAt: DateTime, isAnonymous: Boolean, options: [String!]!): Message!
+  updatePoll(question: String!, allowMultiple: Boolean, allowChangeVote: Boolean, endsAt: DateTime, messageId: Int!, options: [UpdatePollOptionInput!]!): Message!
+  votePoll(messageId: Int!, optionIds: [Int!]!): Poll!
+  cancelPollVote(messageId: Int!): Poll!
+  closePoll(messageId: Int!): Poll!
 }
 
 type Picture {
@@ -70,6 +76,37 @@ type PictureRepresentation {
   link: String!
 }
 
+type Poll {
+  isAnonymous: Boolean!
+  closedAt: DateTime
+  voters: [PollVoter!]!
+  messageId: Int!
+  question: String!
+  allowMultiple: Boolean!
+  allowChangeVote: Boolean!
+  endsAt: DateTime
+  isClosed: Boolean!
+  serverTime: DateTime!
+  selectedOptionIds: [Int!]!
+  options: [PollOption!]!
+  selectedOption: Int
+  totalVotes: Int
+}
+
+type PollOption {
+  id: Int!
+  label: String!
+  votes: Int
+}
+
+type PollVoter {
+  id: Int!
+  username: String!
+  avatarUrl: String
+  votedAt: DateTime
+  optionIds: [Int!]!
+}
+
 enum PunishmentTypes {
   ban
   mute
@@ -84,6 +121,7 @@ type Query {
   isUsernameFree(username: String!): Boolean!
   getTokenByDiscordId(id: String!): Token
   getTokens: [Token!]!
+  getPoll(messageId: Int!): Poll!
   getGrants: String!
   getHello: String!
   version: String!
@@ -111,6 +149,11 @@ type Token {
   createdAt: DateTime!
   expiresAt: DateTime
   usedAt: DateTime
+}
+
+input UpdatePollOptionInput {
+  id: Int
+  label: String!
 }
 
 type User {
