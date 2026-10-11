@@ -110,6 +110,7 @@ export class MessagesResolver {
     return message;
   }
 
+  @UseGuards(OptionalGqlAuthGuard)
   @Subscription(() => Message, {
     name: 'messageCreated',
   })
@@ -117,6 +118,7 @@ export class MessagesResolver {
     return this.pubSub.asyncIterator('messageCreated');
   }
 
+  @UseGuards(OptionalGqlAuthGuard)
   @Subscription(() => Message, {
     name: 'messageDeleted',
   })
@@ -124,6 +126,7 @@ export class MessagesResolver {
     return this.pubSub.asyncIterator('messageDeleted');
   }
 
+  @UseGuards(OptionalGqlAuthGuard)
   @Subscription(() => Message, {
     name: 'messageUpdated',
   })

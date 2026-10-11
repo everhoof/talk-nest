@@ -14,10 +14,7 @@ function checkFileExistsSync(filepath) {
   return flag;
 }
 
-let files = [
-  path.join(__dirname, '.env'),
-  path.join(__dirname, '.env.local'),
-];
+let files = [path.join(__dirname, '.env'), path.join(__dirname, '.env.local')];
 
 if (process.env.NODE_ENV) {
   files.push(

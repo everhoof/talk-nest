@@ -8,14 +8,25 @@ import { AccountsModule } from '@modules/accounts/accounts.module';
 import { UploadModule } from '@modules/upload/upload.module';
 import { PunishmentsRepository } from '@modules/users/repositories/punishments.repository';
 import { UsersRepository } from '@modules/users/repositories/users.repository';
+import { PollsService } from './polls.service';
+import { PollsResolver } from './polls.resolver';
+import { PollVotesRepository } from './repositories/poll-votes.repository';
+import { PollsRepository } from './repositories/polls.repository';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([MessagesRepository, PicturesRepository, PunishmentsRepository, UsersRepository]),
+    TypeOrmModule.forFeature([
+      MessagesRepository,
+      PicturesRepository,
+      PunishmentsRepository,
+      UsersRepository,
+      PollVotesRepository,
+      PollsRepository,
+    ]),
     AccountsModule,
     UploadModule,
   ],
-  providers: [MessagesService, MessagesResolver],
+  providers: [MessagesService, MessagesResolver, PollsService, PollsResolver],
   exports: [MessagesService],
 })
 export class MessagesModule {}
