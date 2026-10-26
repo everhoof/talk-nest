@@ -71,6 +71,10 @@ export class PollsService {
     return labels;
   }
 
+  getActivePolls(): Promise<Message[]> {
+    return this.polls.getActivePolls();
+  }
+
   async getPoll(messageId: number, user?: User): Promise<Poll> {
     const canManage = !!user && roles.can(user.roleNames).updateAny(RoleResources.POLL).granted;
     const { poll: record, options, ownVotes, counts, isClosed, totalVotes, voters } = await this.polls.getPollData(

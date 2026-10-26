@@ -34,6 +34,12 @@ export class PollsResolver {
   }
 
   @UseGuards(OptionalGqlAuthGuard)
+  @Query(() => [Message])
+  getActivePolls(): Promise<Message[]> {
+    return this.polls.getActivePolls();
+  }
+
+  @UseGuards(OptionalGqlAuthGuard)
   @Query(() => Poll)
   getPoll(@Args() args: GetPollArgs, @CurrentUser() user?: User): Promise<Poll> {
     return this.polls.getPoll(args.messageId, user);

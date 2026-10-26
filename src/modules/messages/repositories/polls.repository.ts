@@ -17,6 +17,19 @@ type PollEditableSettings = Pick<MessagePoll, 'allowMultiple' | 'allowChangeVote
 
 @EntityRepository(MessagePoll)
 export class PollsRepository extends BasicRepository<MessagePoll> {
+  async getActivePolls(): Promise<Message[]> {
+    return this.manager
+      .getRepository(Message)
+      .createQueryBuilder('message')
+      .innerJoin(MessagePoll, 'poll', 'poll.messageId = message.id')
+      .where('message.type = :type', { type: MessageType.POLL })
+      .andWhere('message.deletedAt IS NULL')
+      .andWhere('poll.closedAt IS NULL')
+      .andWhere('(poll.endsAt IS NULL OR poll.endsAt > CURRENT_TIMESTAMP)')
+      .orderBy('message.id', 'ASC')
+      .getMany();
+  }
+
   async createPoll(user: User, question: string, labels: string[], settings: PollSettings): Promise<Message> {
     this.validateEndTime(settings.endsAt);
 
