@@ -11,6 +11,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.useGlobalPipes(new ValidationPipe());
   app.enableCors();
+  app.enableShutdownHooks();
 
   if (process.env.NODE_ENV === 'development' && process.env.UPLOAD_DIR) {
     app.useStaticAssets(join(process.cwd(), process.env.UPLOAD_DIR), {

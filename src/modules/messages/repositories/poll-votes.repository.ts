@@ -1,4 +1,6 @@
-import { EntityRepository, In } from 'typeorm';
+import { Injectable } from '@nestjs/common';
+import { InjectEntityManager } from '@nestjs/typeorm';
+import { EntityManager, In } from 'typeorm';
 import type { PollVoter } from '../polls.types';
 import { BasicRepository } from '@modules/common/repositories/basic.repository';
 import { BadRequestException, ForbiddenException } from '@modules/common/exceptions/exceptions';
@@ -8,8 +10,12 @@ import { PollVote } from '../entities/poll-votes.entity';
 import type { PollOptionCount } from '../types/poll-option-count';
 import { MessagesRepository } from './messages.repository';
 
-@EntityRepository(PollVote)
+@Injectable()
 export class PollVotesRepository extends BasicRepository<PollVote> {
+  constructor(@InjectEntityManager() manager: EntityManager) {
+    super(PollVote, manager);
+  }
+
   async getOptionCounts(messageId: number): Promise<PollOptionCount[]> {
     const counts = await this.createQueryBuilder('vote')
       .select('vote.optionId', 'optionId')
@@ -27,7 +33,7 @@ export class PollVotesRepository extends BasicRepository<PollVote> {
       .where({ messageId })
       .getRawOne<{ count: string }>();
 
-    return Number(result.count);
+    return Number(result?.count ?? 0);
   }
 
   async getVoters(messageId: number): Promise<PollVoter[]> {
@@ -77,7 +83,7 @@ export class PollVotesRepository extends BasicRepository<PollVote> {
 
   async addVote(messageId: number, userId: number, optionIds: number[]): Promise<Message> {
     return this.manager.transaction(async (manager) => {
-      const messages = manager.getCustomRepository(MessagesRepository);
+      const messages = new MessagesRepository(manager);
       const { message, poll } = await messages.getPollForUpdate(messageId);
 
       if (poll.isClosed) {
@@ -88,13 +94,13 @@ export class PollVotesRepository extends BasicRepository<PollVote> {
         throw new BadRequestException('POLL_INVALID');
       }
 
-      const options = await manager.find(MessagePollOption, { id: In(optionIds), messageId });
+      const options = await manager.findBy(MessagePollOption, { id: In(optionIds), messageId });
 
       if (options.length !== optionIds.length) {
         throw new BadRequestException('POLL_INVALID');
       }
 
-      const existingVotes = await manager.find(PollVote, { messageId, userId });
+      const existingVotes = await manager.findBy(PollVote, { messageId, userId });
 
       if (existingVotes.length) {
         throw new BadRequestException('POLL_ALREADY_VOTED');
@@ -114,7 +120,7 @@ export class PollVotesRepository extends BasicRepository<PollVote> {
 
   async removeVote(messageId: number, userId: number): Promise<Message> {
     return this.manager.transaction(async (manager) => {
-      const messages = manager.getCustomRepository(MessagesRepository);
+      const messages = new MessagesRepository(manager);
       const { message, poll } = await messages.getPollForUpdate(messageId);
 
       if (poll.isClosed) {

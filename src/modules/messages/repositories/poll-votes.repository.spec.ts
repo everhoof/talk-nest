@@ -1,10 +1,9 @@
-import { In } from 'typeorm';
+import { EntityManager, In } from 'typeorm';
 import { Message, MessageType } from '../entities/messages.entity';
 import { MessagePoll } from '../entities/polls.entity';
 import { MessagePollOption } from '../entities/poll-options.entity';
 import { PollVote } from '../entities/poll-votes.entity';
 import { PollVotesRepository } from './poll-votes.repository';
-import { MessagesRepository } from './messages.repository';
 
 describe('PollVotesRepository without a database', () => {
   const manager = {
@@ -14,9 +13,12 @@ describe('PollVotesRepository without a database', () => {
     insert: jest.fn(),
     delete: jest.fn(),
     save: jest.fn(),
-    getCustomRepository: jest.fn(),
+    findOneBy: jest.fn(),
+    findBy: jest.fn(),
   };
-  const repository = Object.assign(new PollVotesRepository(), { manager });
+  manager.findOneBy = manager.findOne;
+  manager.findBy = manager.find;
+  const repository = new PollVotesRepository(manager as unknown as EntityManager);
   let poll: MessagePoll;
   let message: Message;
 
@@ -31,11 +33,6 @@ describe('PollVotesRepository without a database', () => {
     });
     message = Object.assign(new Message(), { id: 10, type: MessageType.POLL, deletedAt: null });
     manager.transaction.mockImplementation((work) => work(manager));
-    manager.getCustomRepository.mockImplementation((repositoryType) => {
-      expect(repositoryType).toBe(MessagesRepository);
-
-      return Object.assign(new MessagesRepository(), { manager });
-    });
     manager.findOne.mockImplementation(async (entity) => {
       if (entity === Message) return message;
       if (entity === MessagePoll) return poll;
@@ -121,7 +118,7 @@ describe('PollVotesRepository without a database', () => {
 
   it('locks the poll message before writing a ballot', async () => {
     expect(await repository.addVote(10, 2, [11])).toBe(message);
-    expect(manager.findOne).toHaveBeenCalledWith(Message, 10, { lock: { mode: 'pessimistic_write' } });
+    expect(manager.findOne).toHaveBeenCalledWith(Message, { where: { id: 10 }, lock: { mode: 'pessimistic_write' } });
     expect(manager.findOne.mock.invocationCallOrder[0]).toBeLessThan(manager.insert.mock.invocationCallOrder[0]);
     expect(manager.insert).toHaveBeenCalledWith(PollVote, [
       { messageId: 10, userId: 2, optionId: 11, votedAt: expect.any(Date) },
@@ -189,7 +186,8 @@ describe('PollVotesRepository without a database', () => {
     const result = await repository.removeVote(10, 2);
 
     expect(result).toBe(message);
-    expect(manager.findOne).toHaveBeenCalledWith(Message, 10, {
+    expect(manager.findOne).toHaveBeenCalledWith(Message, {
+      where: { id: 10 },
       lock: {
         mode: 'pessimistic_write',
       },

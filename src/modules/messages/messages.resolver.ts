@@ -3,7 +3,7 @@ import { Inject, UseFilters, UseGuards } from '@nestjs/common';
 import { GraphqlExceptionFilter, ThrottlerExceptionFilter } from '@modules/common/filters/http-exception.filter';
 import { Picture } from '@modules/pictures/entities/pictures.entity';
 import { Message } from '@modules/messages/entities/messages.entity';
-import { Loader } from '@intelrug/nestjs-graphql-dataloader';
+import { Loader } from '@modules/common/graphql/dataloader';
 import DataLoader from 'dataloader';
 import { PicturesLoader } from '@modules/pictures/loaders/pictures.loader';
 import { MessagesService } from '@modules/messages/messages.service';
@@ -20,7 +20,10 @@ import { UpdateMessageArgs } from './args/update-message.args';
 @UseFilters(GraphqlExceptionFilter, ThrottlerExceptionFilter)
 @Resolver(() => Message)
 export class MessagesResolver {
-  constructor(@Inject('PUB_SUB') private readonly pubSub: PubSub, private readonly messagesService: MessagesService) {}
+  constructor(
+    @Inject('PUB_SUB') private readonly pubSub: PubSub,
+    private readonly messagesService: MessagesService,
+  ) {}
 
   @ResolveField(() => User, { nullable: true })
   async owner(
@@ -87,7 +90,7 @@ export class MessagesResolver {
   }
 
   private async getMessagesPoll(): Promise<Message[]> {
-    const iterator = this.pubSub.asyncIterator('messageCreated');
+    const iterator = this.pubSub.asyncIterableIterator('messageCreated');
 
     setTimeout(() => {
       iterator.return?.();
@@ -115,7 +118,7 @@ export class MessagesResolver {
     name: 'messageCreated',
   })
   messageCreated(): AsyncIterator<Message> {
-    return this.pubSub.asyncIterator('messageCreated');
+    return this.pubSub.asyncIterableIterator('messageCreated');
   }
 
   @UseGuards(OptionalGqlAuthGuard)
@@ -123,7 +126,7 @@ export class MessagesResolver {
     name: 'messageDeleted',
   })
   messageDeleted(): AsyncIterator<Message> {
-    return this.pubSub.asyncIterator('messageDeleted');
+    return this.pubSub.asyncIterableIterator('messageDeleted');
   }
 
   @UseGuards(OptionalGqlAuthGuard)
@@ -131,6 +134,6 @@ export class MessagesResolver {
     name: 'messageUpdated',
   })
   messageUpdated(): AsyncIterator<Message> {
-    return this.pubSub.asyncIterator('messageUpdated');
+    return this.pubSub.asyncIterableIterator('messageUpdated');
   }
 }

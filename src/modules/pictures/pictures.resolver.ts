@@ -6,7 +6,7 @@ import { PicturesService } from '@modules/pictures/pictures.service';
 import { PictureRepresentation } from '@modules/pictures/entities/picture-representations.entity';
 import { PictureRepresentationsLoader } from '@modules/pictures/loaders/picture-representations.loader';
 import DataLoader from 'dataloader';
-import { Loader } from '@intelrug/nestjs-graphql-dataloader';
+import { Loader } from '@modules/common/graphql/dataloader';
 import { GetPictureByIdArgs } from '@modules/pictures/args/get-picture-by-id.args';
 import { UsersLoader } from '@modules/users/loaders/users.loader';
 import { User } from '@modules/users/entities/users.entity';

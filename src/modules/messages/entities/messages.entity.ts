@@ -15,6 +15,8 @@ import { Field, Int, ObjectType } from '@nestjs/graphql';
 import { User } from '@modules/users/entities/users.entity';
 import { Picture } from '@modules/pictures/entities/pictures.entity';
 
+// Several message types intentionally share the same stored schema version.
+/* eslint-disable @typescript-eslint/no-duplicate-enum-values */
 export enum MessageSchema {
   SYSTEM = '1',
   GENERAL = '1',
@@ -23,6 +25,7 @@ export enum MessageSchema {
   DONATION = '2',
   POLL = '3',
 }
+/* eslint-enable @typescript-eslint/no-duplicate-enum-values */
 
 export enum MessageType {
   SYSTEM = 1,

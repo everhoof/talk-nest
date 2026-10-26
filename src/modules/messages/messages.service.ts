@@ -1,5 +1,4 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 import { MessagesRepository } from '@modules/messages/repositories/messages.repository';
 import { CreateMessageArgs } from '@modules/messages/args/create-message.args';
 import { Message, MessageSchema, MessageType } from '@modules/messages/entities/messages.entity';
@@ -23,7 +22,7 @@ import { PunishmentsRepository } from '@modules/users/repositories/punishments.r
 import { PunishmentTypes } from '@modules/users/args/punishment.args';
 import { UpdateMessageArgs } from './args/update-message.args';
 import { Service } from '../../tokens';
-import { Config } from '@modules/config';
+import type { Config } from '@modules/config';
 import { UsersRepository } from '@modules/users/repositories/users.repository';
 import { OnEvent } from '@nestjs/event-emitter';
 import { EventTypes } from '@modules/common/events/event-types';
@@ -33,18 +32,14 @@ import { DonationEvent } from '@modules/common/events/donation/donation.event';
 
 @Injectable()
 export class MessagesService {
-  private readonly logger = new Logger(MessagesService.name, true);
+  private readonly logger = new Logger(MessagesService.name);
 
   constructor(
     @Inject(Service.CONFIG) private readonly config: Config,
     @Inject('PUB_SUB') private readonly pubSub: PubSub,
-    @InjectRepository(MessagesRepository)
     private readonly messagesRepository: MessagesRepository,
-    @InjectRepository(PicturesRepository)
     private readonly picturesRepository: PicturesRepository,
-    @InjectRepository(PunishmentsRepository)
     private readonly punishmentsRepository: PunishmentsRepository,
-    @InjectRepository(UsersRepository)
     private readonly usersRepository: UsersRepository,
     private readonly uploadService: UploadService,
   ) {}
@@ -207,9 +202,9 @@ export class MessagesService {
 
     if (args.fromDateTime) {
       if (args.reverse) {
-        where = { createdAt: LessThanOrEqual(args.fromDateTime) };
+        where = { createdAt: LessThanOrEqual(new Date(args.fromDateTime)) };
       } else {
-        where = { createdAt: MoreThanOrEqual(args.fromDateTime) };
+        where = { createdAt: MoreThanOrEqual(new Date(args.fromDateTime)) };
         order = { id: 'ASC' };
       }
     } else if (args.lastId) {
@@ -252,7 +247,7 @@ export class MessagesService {
     const canDeleteOwn: boolean = roles.can(user.roleNames).deleteOwn('message').granted;
     if (!args.messageId || (!canDeleteOwn && !canDeleteAny)) throw new BadRequestException('FORBIDDEN');
 
-    const message = await this.messagesRepository.findOne(args.messageId);
+    const message = await this.messagesRepository.findOneBy({ id: args.messageId });
 
     if (!message) throw new BadRequestException('FORBIDDEN');
     if (!canDeleteAny && canDeleteOwn && message.ownerId !== user.id) throw new BadRequestException('FORBIDDEN');

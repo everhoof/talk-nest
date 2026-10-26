@@ -1,10 +1,16 @@
-import { EntityRepository } from 'typeorm';
+import { Injectable } from '@nestjs/common';
+import { InjectEntityManager } from '@nestjs/typeorm';
+import { EntityManager } from 'typeorm';
 import { randomBytes } from 'crypto';
 import { Token } from '@modules/accounts/entities/tokens.entity';
 import { BasicRepository } from '@modules/common/repositories/basic.repository';
 
-@EntityRepository(Token)
+@Injectable()
 export class TokensRepository extends BasicRepository<Token> {
+  constructor(@InjectEntityManager() manager: EntityManager) {
+    super(Token, manager);
+  }
+
   async createNewToken(ownerId: number): Promise<Token> {
     const tokenString = await this.createTokenString();
     let tokenEntity: Token | undefined = this.create({
@@ -12,12 +18,12 @@ export class TokensRepository extends BasicRepository<Token> {
       ownerId: ownerId,
     });
     tokenEntity = await this.save(tokenEntity);
-    tokenEntity = await this.findOneOrFail(tokenEntity.id);
+    tokenEntity = await this.findOneByOrFail({ id: tokenEntity.id });
     return tokenEntity;
   }
 
-  getTokenByValue(value: string | undefined): Promise<Token | undefined> {
-    if (!value) return Promise.resolve(undefined);
+  getTokenByValue(value: string | undefined): Promise<Token | null> {
+    if (!value) return Promise.resolve(null);
     return this.findOne({ relations: ['owner', 'owner.roles'], where: { value } });
   }
 

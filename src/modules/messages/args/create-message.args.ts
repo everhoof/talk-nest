@@ -15,7 +15,7 @@ export class CreateMessageArgs {
   @IsOptional()
   randomId?: string;
 
-  @Field(() => [Int], { defaultValue: [] })
+  @Field(() => [Int], { nullable: true, defaultValue: [] })
   @IsArray()
   @IsInt({ each: true })
   @ArrayMaxSize(32)

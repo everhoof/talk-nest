@@ -1,6 +1,5 @@
 import { Injectable, Scope } from '@nestjs/common';
-import { OrderedNestDataLoader } from '@intelrug/nestjs-graphql-dataloader';
-import { InjectRepository } from '@nestjs/typeorm';
+import { OrderedNestDataLoader } from '@modules/common/graphql/dataloader';
 import { PictureRepresentation } from '@modules/pictures/entities/picture-representations.entity';
 import { PictureRepresentationsRepository } from '@modules/pictures/repositories/picture-representations.repository';
 
@@ -9,10 +8,7 @@ export class PictureRepresentationsLoader extends OrderedNestDataLoader<
   PictureRepresentation['id'],
   PictureRepresentation
 > {
-  constructor(
-    @InjectRepository(PictureRepresentationsRepository)
-    private readonly pictureRepresentationsRepository: PictureRepresentationsRepository,
-  ) {
+  constructor(private readonly pictureRepresentationsRepository: PictureRepresentationsRepository) {
     super();
   }
 

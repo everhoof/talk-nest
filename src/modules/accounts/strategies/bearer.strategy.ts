@@ -29,7 +29,7 @@ export class BearerStrategyNoException extends PassportStrategy(Strategy, 'beare
     try {
       const tokenEntity = await this.accountsService.validateUserByToken(token);
       return tokenEntity?.owner || -1;
-    } catch (e) {
+    } catch {
       return -1;
     }
   }

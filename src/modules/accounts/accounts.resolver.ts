@@ -18,12 +18,15 @@ import { GetTokenByDiscordIdArgs } from '@modules/accounts/args/get-token-by-dis
 import { BadRequestException } from '@modules/common/exceptions/exceptions';
 import { InvalidateTokenByIdArgs } from '@modules/accounts/args/invalidate-token-by-id.args';
 import { OAuthDiscordArgs } from '@modules/accounts/args/oauth-discord.args';
-import { Request } from 'express';
+import type { Request } from 'express';
 
 @UseFilters(GraphqlExceptionFilter, ThrottlerExceptionFilter)
 @Resolver('Accounts')
 export class AccountsResolver {
-  constructor(@Inject('PUB_SUB') private readonly pubSub: PubSub, private readonly accountsService: AccountsService) {}
+  constructor(
+    @Inject('PUB_SUB') private readonly pubSub: PubSub,
+    private readonly accountsService: AccountsService,
+  ) {}
 
   // @Throttle(10, 20)
   @Mutation(() => Token)
@@ -79,7 +82,7 @@ export class AccountsResolver {
 
   @Query(() => Token, { nullable: true })
   @UseGuards(GqlAuthGuard)
-  getTokenByDiscordId(@Args() args: GetTokenByDiscordIdArgs, @CurrentUser() user: User): Promise<Token | undefined> {
+  getTokenByDiscordId(@Args() args: GetTokenByDiscordIdArgs, @CurrentUser() user: User): Promise<Token | null> {
     if (!user.roleNames.includes(AppRoles.ADMIN)) throw new BadRequestException('FORBIDDEN');
     return this.accountsService.getTokenByDiscordId(args);
   }
@@ -112,6 +115,6 @@ export class AccountsResolver {
 
   @Subscription(() => String)
   userRegisteredViaDiscord(): AsyncIterator<string> {
-    return this.pubSub.asyncIterator(SubscriptionEvents.USER_REGISTERED_VIA_DISCORD);
+    return this.pubSub.asyncIterableIterator(SubscriptionEvents.USER_REGISTERED_VIA_DISCORD);
   }
 }

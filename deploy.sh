@@ -1,3 +1,5 @@
+set -e
+
 export NVM_DIR=~/.nvm
 source ~/.nvm/nvm.sh
 
@@ -5,10 +7,14 @@ find . -maxdepth 1 ! -name node_modules ! -name artifacts.tgz ! -name .env.local
 tar -xvf artifacts.tgz
 rm artifacts.tgz
 
-pm2 stop ecosystem.config.js
-nvm exec 14.18.1 npm i -g yarn
-nvm exec 14.18.1 yarn --frozen-lockfile --production
-nvm exec 14.18.1 yarn typeorm:prod migration:run
-nvm exec 14.18.1 yarn seeder:prod migration:run
-pm2 start ecosystem.config.js
-pm2 save
+api_pm2_executable="$(command -v pm2)"
+"$api_pm2_executable" stop ecosystem.config.js
+nvm install
+nvm use
+corepack enable
+corepack install
+pnpm install --frozen-lockfile --prod
+pnpm typeorm:prod migration:run
+pnpm seeder:prod migration:run
+API_NODE_EXECUTABLE="$(command -v node)" "$api_pm2_executable" start ecosystem.config.js
+"$api_pm2_executable" save

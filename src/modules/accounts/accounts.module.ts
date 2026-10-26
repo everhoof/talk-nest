@@ -1,5 +1,4 @@
 import { forwardRef, Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { PassportModule } from '@nestjs/passport';
 import { UsersModule } from '@modules/users/users.module';
 import { TokensRepository } from '@modules/accounts/repositories/tokens.repository';
@@ -13,18 +12,19 @@ import { ConfirmationsRepository } from '@modules/accounts/repositories/confirma
 import { OAuthRepository } from '@modules/accounts/repositories/oauth.repository';
 
 @Module({
-  imports: [
-    forwardRef(() => UsersModule),
-    PassportModule,
-    TypeOrmModule.forFeature([
-      TokensRepository,
-      UsersRepository,
-      RolesRepository,
-      ConfirmationsRepository,
-      OAuthRepository,
-    ]),
+  imports: [forwardRef(() => UsersModule), PassportModule],
+  providers: [
+    TokensRepository,
+    UsersRepository,
+    RolesRepository,
+    ConfirmationsRepository,
+    OAuthRepository,
+    AccountsService,
+    AccountsResolver,
+    BearerStrategy,
+    BearerStrategyNoException,
+    AnonymousStrategy,
   ],
-  providers: [AccountsService, AccountsResolver, BearerStrategy, BearerStrategyNoException, AnonymousStrategy],
-  exports: [AccountsService, TypeOrmModule.forFeature([TokensRepository])],
+  exports: [AccountsService, TokensRepository],
 })
 export class AccountsModule {}

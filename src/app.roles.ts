@@ -1,4 +1,4 @@
-import { RolesBuilder } from 'nest-access-control';
+import { AccessControl } from 'accesscontrol';
 
 export enum AppRoles {
   BROADCASTER = 'BROADCASTER',
@@ -17,7 +17,7 @@ export enum RoleResources {
   USER_SETTINGS = 'user-settings',
 }
 
-export const roles: RolesBuilder = new RolesBuilder();
+export const roles = new AccessControl();
 
 roles
   .grant(AppRoles.UNVERIFIED_USER)

@@ -1,16 +1,22 @@
-import { EntityRepository } from 'typeorm';
+import { Injectable } from '@nestjs/common';
+import { InjectEntityManager } from '@nestjs/typeorm';
+import { EntityManager } from 'typeorm';
 import { Confirmation } from '@modules/accounts/entities/confirmations.entity';
 import { ConfirmationType } from '@modules/accounts/types/confirmation-type.enum';
 import { InternalServerErrorException } from '@nestjs/common';
 import { Utils } from '@modules/common/utils/utils';
 import { BasicRepository } from '@modules/common/repositories/basic.repository';
 
-@EntityRepository(Confirmation)
+@Injectable()
 export class ConfirmationsRepository extends BasicRepository<Confirmation> {
+  constructor(@InjectEntityManager() manager: EntityManager) {
+    super(Confirmation, manager);
+  }
+
   async createNewConfirmation(userId: number, type: ConfirmationType, sendCount = 0): Promise<Confirmation> {
     if (!userId) throw new InternalServerErrorException('UNKNOWN');
 
-    let confirmationEntity: Confirmation | undefined = await this.findOne({ where: { userId, type } });
+    let confirmationEntity: Confirmation | null = await this.findOne({ where: { userId, type } });
     if (confirmationEntity) {
       confirmationEntity.createdAt = new Date();
     } else {
@@ -26,8 +32,8 @@ export class ConfirmationsRepository extends BasicRepository<Confirmation> {
     return this.saveAndReturn(confirmationEntity);
   }
 
-  getConfirmationByValue(value: string): Promise<Confirmation | undefined> {
-    if (!value) return Promise.resolve(undefined);
+  getConfirmationByValue(value: string): Promise<Confirmation | null> {
+    if (!value) return Promise.resolve(null);
     return this.findOne({ where: { value } });
   }
 
@@ -37,7 +43,7 @@ export class ConfirmationsRepository extends BasicRepository<Confirmation> {
     return value ? this.createConfirmationString() : newValue;
   }
 
-  findOnePasswordResetByUserId(userId: number): Promise<Confirmation | undefined> {
+  findOnePasswordResetByUserId(userId: number): Promise<Confirmation | null> {
     return this.findOne({ where: { userId, type: ConfirmationType.password } });
   }
 }

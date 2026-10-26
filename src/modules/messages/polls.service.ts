@@ -1,5 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 import { PubSub } from 'graphql-subscriptions';
 import { RoleResources, roles } from '../../app.roles';
 import { User } from '@modules/users/entities/users.entity';
@@ -13,8 +12,8 @@ import { CreatePollArgs, Poll, UpdatePollArgs, VotePollArgs } from './polls.type
 @Injectable()
 export class PollsService {
   constructor(
-    @InjectRepository(PollsRepository) private readonly polls: PollsRepository,
-    @InjectRepository(PollVotesRepository) private readonly votes: PollVotesRepository,
+    private readonly polls: PollsRepository,
+    private readonly votes: PollVotesRepository,
     private readonly messagesService: MessagesService,
     @Inject('PUB_SUB') private readonly pubSub: PubSub,
   ) {}
@@ -73,11 +72,15 @@ export class PollsService {
 
   async getPoll(messageId: number, user?: User): Promise<Poll> {
     const canManage = !!user && roles.can(user.roleNames).updateAny(RoleResources.POLL).granted;
-    const { poll: record, options, ownVotes, counts, isClosed, totalVotes, voters } = await this.polls.getPollData(
-      messageId,
-      user?.id,
-      canManage,
-    );
+    const {
+      poll: record,
+      options,
+      ownVotes,
+      counts,
+      isClosed,
+      totalVotes,
+      voters,
+    } = await this.polls.getPollData(messageId, user?.id, canManage);
 
     const poll: Poll = {
       messageId,

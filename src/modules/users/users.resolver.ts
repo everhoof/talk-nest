@@ -5,11 +5,11 @@ import { User } from '@modules/users/entities/users.entity';
 import { CurrentUser, GqlAuthGuard, OptionalGqlAuthGuard } from '@modules/common/guards/auth.guard';
 import { Picture } from '@modules/pictures/entities/pictures.entity';
 import { PicturesLoader } from '@modules/pictures/loaders/pictures.loader';
-import { Loader } from '@intelrug/nestjs-graphql-dataloader';
+import { Loader } from '@modules/common/graphql/dataloader';
 import DataLoader from 'dataloader';
 import { PubSub } from 'graphql-subscriptions';
 import { UsersService } from '@modules/users/users.service';
-import { UseRoles } from 'nest-access-control';
+import { UseRoles } from '@modules/common/guards/access-control.guard';
 import { PunishmentArgs, PunishmentTypes } from '@modules/users/args/punishment.args';
 import { UnpunishmentArgs } from '@modules/users/args/unpunishment.args';
 import { Punishment } from '@modules/users/entities/punishments.entity';
@@ -23,7 +23,10 @@ import { SearchUsersArgs } from '@modules/users/args/search-users.args';
 @UseFilters(GraphqlExceptionFilter, ThrottlerExceptionFilter)
 @Resolver(() => User)
 export class UsersResolver {
-  constructor(@Inject('PUB_SUB') private readonly pubSub: PubSub, private readonly usersService: UsersService) {}
+  constructor(
+    @Inject('PUB_SUB') private readonly pubSub: PubSub,
+    private readonly usersService: UsersService,
+  ) {}
 
   @ResolveField(() => Picture, { nullable: true })
   async avatar(
@@ -141,7 +144,7 @@ export class UsersResolver {
     resolve: (value) => value,
   })
   onlineUpdated(): AsyncIterator<User[]> {
-    return this.pubSub.asyncIterator(SubscriptionEvents.ONLINE_UPDATED);
+    return this.pubSub.asyncIterableIterator(SubscriptionEvents.ONLINE_UPDATED);
   }
 
   /**
@@ -164,6 +167,6 @@ export class UsersResolver {
   })
   @UseGuards(OptionalGqlAuthGuard)
   userUpdated(): AsyncIterator<User> {
-    return this.pubSub.asyncIterator(SubscriptionEvents.USER_UPDATED);
+    return this.pubSub.asyncIterableIterator(SubscriptionEvents.USER_UPDATED);
   }
 }

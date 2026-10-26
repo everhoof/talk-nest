@@ -1,9 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { GraphQLModule } from '@nestjs/graphql';
+import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { join } from 'path';
-import { AccessControlModule } from 'nest-access-control';
-import { roles } from './app.roles';
 import { ScheduleModule } from '@nestjs/schedule';
 import { UsersModule } from '@modules/users/users.module';
 import { AccountsModule } from '@modules/accounts/accounts.module';
@@ -13,7 +12,7 @@ import { PicturesModule } from '@modules/pictures/pictures.module';
 import { MessagesModule } from '@modules/messages/messages.module';
 import { UploadModule } from '@modules/upload/upload.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
-import { DataLoaderInterceptor } from '@intelrug/nestjs-graphql-dataloader';
+import { DataLoaderInterceptor } from '@modules/common/graphql/dataloader';
 import { CommonModule } from '@modules/common/common.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
@@ -21,30 +20,20 @@ import { TypeOrmConfigService } from '@modules/common/typeorm';
 import { ConfigModule } from '@modules/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DonationAlertsModule } from '@modules/donation-alerts/donation-alerts.module';
+import { SubscriptionsService } from '@modules/common/graphql/subscriptions.service';
+import { formatGraphqlError } from '@modules/common/graphql/format-error';
 
 @Module({
   imports: [
     ConfigModule,
     EventEmitterModule.forRoot(),
-    GraphQLModule.forRoot({
+    GraphQLModule.forRoot<ApolloDriverConfig>({
+      driver: ApolloDriver,
       debug: process.env.NODE_ENV !== 'production',
-      autoSchemaFile: join(process.cwd(), './graphql/schema.graphql'),
-      installSubscriptionHandlers: true,
-      subscriptions: {
-        onConnect: (connectionParams: { [key: string]: any }, websocket: { [key: string]: any }) => {
-          return {
-            headers: {
-              ...(websocket?.upgradeReq?.headers || {}),
-              authorization: connectionParams?.['Authorization'] || undefined,
-            },
-          };
-        },
-      },
-      context: ({ req, res, connection }) => ({
-        req: connection?.context || req,
-        res,
-        connection,
-      }),
+      autoSchemaFile: process.env.NODE_ENV === 'test' ? true : join(process.cwd(), './graphql/schema.graphql'),
+      graphiql: process.env.NODE_ENV !== 'production',
+      context: ({ req, res }) => ({ req, res }),
+      formatError: formatGraphqlError,
     }),
     TypeOrmModule.forRootAsync({
       useClass: TypeOrmConfigService,
@@ -63,7 +52,6 @@ import { DonationAlertsModule } from '@modules/donation-alerts/donation-alerts.m
       },
     }),
     // ThrottlerModule.forRoot(),
-    AccessControlModule.forRoles(roles),
     ScheduleModule.forRoot(),
     CommonModule,
     UsersModule,
@@ -76,6 +64,7 @@ import { DonationAlertsModule } from '@modules/donation-alerts/donation-alerts.m
   ],
   providers: [
     AppResolver,
+    SubscriptionsService,
     {
       provide: APP_INTERCEPTOR,
       useClass: DataLoaderInterceptor,

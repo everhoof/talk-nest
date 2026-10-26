@@ -1,19 +1,18 @@
-import { In } from 'typeorm';
+import { EntityManager, In } from 'typeorm';
 import { User } from '@modules/users/entities/users.entity';
 import { Message, MessageType } from '../entities/messages.entity';
 import { MessagePoll } from '../entities/polls.entity';
 import { MessagePollOption } from '../entities/poll-options.entity';
 import { PollVotesRepository } from './poll-votes.repository';
 import { PollsRepository } from './polls.repository';
-import { MessagesRepository } from './messages.repository';
 
 describe('PollsRepository without a database', () => {
   const votes = {
-    find: jest.fn(),
-    getOptionCounts: jest.fn(),
-    getVoterCount: jest.fn(),
-    getVoters: jest.fn(),
-    hasMultipleSelections: jest.fn(),
+    findBy: jest.spyOn(PollVotesRepository.prototype, 'findBy'),
+    getOptionCounts: jest.spyOn(PollVotesRepository.prototype, 'getOptionCounts'),
+    getVoterCount: jest.spyOn(PollVotesRepository.prototype, 'getVoterCount'),
+    getVoters: jest.spyOn(PollVotesRepository.prototype, 'getVoters'),
+    hasMultipleSelections: jest.spyOn(PollVotesRepository.prototype, 'hasMultipleSelections'),
   };
   const manager = {
     transaction: jest.fn(),
@@ -24,9 +23,12 @@ describe('PollsRepository without a database', () => {
     delete: jest.fn(),
     update: jest.fn(),
     save: jest.fn(),
-    getCustomRepository: jest.fn(),
+    findOneBy: jest.fn(),
+    findBy: jest.fn(),
   };
-  const repository = Object.assign(new PollsRepository(), { manager });
+  manager.findOneBy = manager.findOne;
+  manager.findBy = manager.find;
+  const repository = new PollsRepository(manager as unknown as EntityManager);
   const options = [
     { id: 11, label: 'Рок' },
     { id: 12, label: 'Джаз' },
@@ -56,16 +58,7 @@ describe('PollsRepository without a database', () => {
     manager.find.mockResolvedValue(options);
     manager.create.mockImplementation((_entity, value) => value);
     manager.save.mockImplementation(async (_entity, value) => value);
-    manager.getCustomRepository.mockImplementation((repositoryType) => {
-      if (repositoryType === MessagesRepository) {
-        return Object.assign(new MessagesRepository(), { manager });
-      }
-
-      expect(repositoryType).toBe(PollVotesRepository);
-
-      return votes;
-    });
-    votes.find.mockResolvedValue([]);
+    votes.findBy.mockResolvedValue([]);
     votes.getVoters.mockResolvedValue([]);
     votes.getOptionCounts.mockResolvedValue([{ optionId: 11, votes: 1 }]);
     votes.getVoterCount.mockResolvedValue(1);
@@ -116,8 +109,7 @@ describe('PollsRepository without a database', () => {
       totalVotes: 1,
       counts: [{ optionId: 11, votes: 1 }],
     });
-    expect(votes.find).not.toHaveBeenCalled();
-    expect(manager.getCustomRepository).toHaveBeenCalledWith(PollVotesRepository);
+    expect(votes.findBy).not.toHaveBeenCalled();
     expect(manager.transaction).toHaveBeenCalledWith('REPEATABLE READ', expect.any(Function));
   });
 
@@ -133,7 +125,7 @@ describe('PollsRepository without a database', () => {
     );
     expect(manager.update).toHaveBeenCalledWith(MessagePollOption, 12, { label: 'Джаз!', position: 0 });
     expect(manager.update).toHaveBeenCalledWith(MessagePollOption, 11, { label: 'Рок!', position: 1 });
-    expect(manager.findOne).toHaveBeenCalledWith(Message, 10, { lock: { mode: 'pessimistic_write' } });
+    expect(manager.findOne).toHaveBeenCalledWith(Message, { where: { id: 10 }, lock: { mode: 'pessimistic_write' } });
     expect(manager.findOne.mock.invocationCallOrder[0]).toBeLessThan(manager.update.mock.invocationCallOrder[0]);
     expect(manager.delete).not.toHaveBeenCalled();
     expect(manager.insert).not.toHaveBeenCalled();
@@ -215,7 +207,7 @@ describe('PollsRepository without a database', () => {
   it('closes an active poll and leaves an already closed poll unchanged', async () => {
     await repository.closePoll(10);
     expect(manager.update).toHaveBeenCalledWith(MessagePoll, { messageId: 10 }, { closedAt: expect.any(Date) });
-    expect(manager.findOne).toHaveBeenCalledWith(Message, 10, { lock: { mode: 'pessimistic_write' } });
+    expect(manager.findOne).toHaveBeenCalledWith(Message, { where: { id: 10 }, lock: { mode: 'pessimistic_write' } });
     manager.update.mockClear();
     poll.closedAt = new Date();
     await repository.closePoll(10);

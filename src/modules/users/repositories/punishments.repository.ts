@@ -1,10 +1,16 @@
-import { EntityRepository, IsNull } from 'typeorm';
+import { Injectable } from '@nestjs/common';
+import { InjectEntityManager } from '@nestjs/typeorm';
+import { EntityManager, IsNull } from 'typeorm';
 import { BasicRepository } from '@modules/common/repositories/basic.repository';
 import { Punishment } from '@modules/users/entities/punishments.entity';
 
-@EntityRepository(Punishment)
+@Injectable()
 export class PunishmentsRepository extends BasicRepository<Punishment> {
-  public getLastPunishment(userId: number): Promise<Punishment | undefined> {
+  constructor(@InjectEntityManager() manager: EntityManager) {
+    super(Punishment, manager);
+  }
+
+  public getLastPunishment(userId: number): Promise<Punishment | null> {
     return this.findOne({
       where: {
         targetId: userId,

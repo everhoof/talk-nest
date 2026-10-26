@@ -1,5 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 import { UsersRepository } from '@modules/users/repositories/users.repository';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { IsNull, LessThanOrEqual } from 'typeorm';
@@ -27,13 +26,9 @@ export class UsersService {
     @Inject('PUB_SUB')
     private readonly pubSub: PubSub,
     private readonly eventEmitter: EventEmitter2,
-    @InjectRepository(UsersRepository)
     private readonly users: UsersRepository,
-    @InjectRepository(TokensRepository)
     private readonly tokens: TokensRepository,
-    @InjectRepository(PunishmentsRepository)
     private readonly punishments: PunishmentsRepository,
-    @InjectRepository(PicturesRepository)
     private readonly pictures: PicturesRepository,
     private readonly messagesService: MessagesService,
   ) {}
@@ -41,7 +36,7 @@ export class UsersService {
   public onlineUsersIds: number[] = [];
 
   async getUserById(args: GetUserByIdArgs): Promise<User> {
-    const user = await this.users.findOne(args.id);
+    const user = await this.users.findOneBy({ id: args.id });
     if (!user) throw new BadRequestException('USER_DOES_NOT_EXIST_WITH_ID', args.id.toString());
     return user;
   }
@@ -75,7 +70,7 @@ export class UsersService {
   async unpunishUsers(): Promise<void> {
     const punishments = await this.punishments.find({
       where: {
-        cancelAt: LessThanOrEqual(DateTime.utc().toSQL()),
+        cancelAt: LessThanOrEqual(DateTime.utc().toJSDate()),
         canceledAt: IsNull(),
       },
     });

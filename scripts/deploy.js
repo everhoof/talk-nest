@@ -1,4 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const ghpages = require('gh-pages');
 
 ghpages.publish(
@@ -8,9 +8,10 @@ ghpages.publish(
       'dist/**/*',
       'resources/**/*',
       'mail/**/*',
-      'ormconfig.prod.js',
       'package.json',
-      'yarn.lock',
+      '.nvmrc',
+      'pnpm-lock.yaml',
+      'pnpm-workspace.yaml',
       '.env.example',
       'tsconfig.json',
     ],

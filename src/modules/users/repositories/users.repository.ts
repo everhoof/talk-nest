@@ -1,14 +1,20 @@
-import { EntityRepository, ILike, LessThanOrEqual, MoreThan, Not } from 'typeorm';
+import { Injectable } from '@nestjs/common';
+import { InjectEntityManager } from '@nestjs/typeorm';
+import { EntityManager, ILike, LessThanOrEqual, MoreThan, Not } from 'typeorm';
 import { User, UserState } from '@modules/users/entities/users.entity';
 import { BasicRepository } from '@modules/common/repositories/basic.repository';
 import { SignUpArgs } from '@modules/accounts/args/sign-up.args';
 import { DateTime } from 'luxon';
 
-@EntityRepository(User)
+@Injectable()
 export class UsersRepository extends BasicRepository<User> {
+  constructor(@InjectEntityManager() manager: EntityManager) {
+    super(User, manager);
+  }
+
   static readonly OFFLINE_TIME_IN_SECONDS = 120;
-  getUserByEmailOrUsername(email: string | undefined): Promise<User | undefined> {
-    if (!email) return Promise.resolve(undefined);
+  getUserByEmailOrUsername(email: string | undefined): Promise<User | null> {
+    if (!email) return Promise.resolve(null);
 
     return this.findOne({
       select: ['id', 'username', 'email', 'salt', 'hash'],
@@ -16,8 +22,8 @@ export class UsersRepository extends BasicRepository<User> {
     });
   }
 
-  getUserByEmailAndUsername(email: string | undefined, username?: string | undefined): Promise<User | undefined> {
-    if (!email) return Promise.resolve(undefined);
+  getUserByEmailAndUsername(email: string | undefined, username?: string | undefined): Promise<User | null> {
+    if (!email) return Promise.resolve(null);
 
     return this.findOne({
       where: [
@@ -40,7 +46,7 @@ export class UsersRepository extends BasicRepository<User> {
   }
 
   async findOnline(seconds = 120): Promise<Record<'online' | 'offline', User[]>> {
-    const timestamp = DateTime.utc().minus({ seconds }).toSQL();
+    const timestamp = DateTime.utc().minus({ seconds }).toJSDate();
 
     return await this.manager.transaction(async (entityManager) => {
       const online = await entityManager.find(User, {

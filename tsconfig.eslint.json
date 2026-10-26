@@ -10,7 +10,10 @@
     ".eslintrc.js",
     "environment.js",
     "jest.config.js",
-    "jest.setup.js",
-    "ormconfig.js"
-  ]
+    "jest.setup.js"
+  ],
+  "compilerOptions": {
+    "rootDir": ".",
+    "types": ["node", "express", "multer", "jest"]
+  }
 }

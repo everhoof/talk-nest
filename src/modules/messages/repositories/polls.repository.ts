@@ -1,4 +1,6 @@
-import { EntityManager, EntityRepository, In, IsNull } from 'typeorm';
+import { Injectable } from '@nestjs/common';
+import { InjectEntityManager } from '@nestjs/typeorm';
+import { EntityManager, In, IsNull } from 'typeorm';
 import { BasicRepository } from '@modules/common/repositories/basic.repository';
 import { BadRequestException } from '@modules/common/exceptions/exceptions';
 import { User } from '@modules/users/entities/users.entity';
@@ -15,8 +17,12 @@ import { MessagesRepository } from './messages.repository';
 type PollSettings = Pick<MessagePoll, 'allowMultiple' | 'allowChangeVote' | 'endsAt'> & { isAnonymous?: boolean };
 type PollEditableSettings = Pick<MessagePoll, 'allowMultiple' | 'allowChangeVote' | 'endsAt'>;
 
-@EntityRepository(MessagePoll)
+@Injectable()
 export class PollsRepository extends BasicRepository<MessagePoll> {
+  constructor(@InjectEntityManager() manager: EntityManager) {
+    super(MessagePoll, manager);
+  }
+
   async createPoll(user: User, question: string, labels: string[], settings: PollSettings): Promise<Message> {
     this.validateEndTime(settings.endsAt);
 
@@ -57,7 +63,7 @@ export class PollsRepository extends BasicRepository<MessagePoll> {
           deletedAt: IsNull(),
         },
       });
-      const poll = await manager.findOne(MessagePoll, { messageId });
+      const poll = await manager.findOneBy(MessagePoll, { messageId });
 
       if (!message || message.type !== MessageType.POLL || !poll) {
         throw new BadRequestException('MESSAGE_NOT_FOUND');
@@ -72,14 +78,14 @@ export class PollsRepository extends BasicRepository<MessagePoll> {
         },
       });
 
-      const votes = manager.getCustomRepository(PollVotesRepository);
+      const votes = new PollVotesRepository(manager);
       let ownVotes: PollVote[] = [];
       const isClosed = poll.isClosed;
       let counts: PollOptionCount[] = [];
       let totalVotes: number | null = null;
 
       if (userId !== undefined) {
-        ownVotes = await votes.find({ messageId, userId });
+        ownVotes = await votes.findBy({ messageId, userId });
       }
 
       if (ownVotes.length || isClosed || canManage) {
@@ -100,7 +106,7 @@ export class PollsRepository extends BasicRepository<MessagePoll> {
     settings: Partial<PollEditableSettings>,
   ): Promise<Message> {
     return this.manager.transaction(async (manager) => {
-      const messages = manager.getCustomRepository(MessagesRepository);
+      const messages = new MessagesRepository(manager);
       const { message, poll } = await messages.getPollForUpdate(messageId);
 
       this.validateDeadlineChange(poll, settings.endsAt);
@@ -118,7 +124,7 @@ export class PollsRepository extends BasicRepository<MessagePoll> {
 
   async closePoll(messageId: number): Promise<Message> {
     return this.manager.transaction(async (manager) => {
-      const messages = manager.getCustomRepository(MessagesRepository);
+      const messages = new MessagesRepository(manager);
       const { message, poll } = await messages.getPollForUpdate(messageId);
 
       if (!poll.isClosed) {
@@ -156,7 +162,7 @@ export class PollsRepository extends BasicRepository<MessagePoll> {
     messageId: number,
     options: { id?: number | null; label: string }[],
   ): Promise<void> {
-    const previousOptions = await manager.find(MessagePollOption, { messageId });
+    const previousOptions = await manager.findBy(MessagePollOption, { messageId });
     const previousIds = new Set(previousOptions.map((option) => option.id));
     const retainedIds = options.flatMap((option) => (option.id == null ? [] : [option.id]));
     const hasDuplicateIds = new Set(retainedIds).size !== retainedIds.length;
@@ -188,7 +194,7 @@ export class PollsRepository extends BasicRepository<MessagePoll> {
     settings: Partial<PollEditableSettings>,
   ): Promise<void> {
     if (poll.allowMultiple && settings.allowMultiple === false) {
-      const votes = manager.getCustomRepository(PollVotesRepository);
+      const votes = new PollVotesRepository(manager);
 
       if (await votes.hasMultipleSelections(poll.messageId)) {
         throw new BadRequestException('POLL_MULTIPLE_VOTES_EXIST');

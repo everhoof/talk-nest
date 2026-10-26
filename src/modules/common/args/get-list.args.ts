@@ -3,14 +3,14 @@ import { IsInt, IsOptional, Max, Min } from 'class-validator';
 
 @ArgsType()
 export class GetListArgs {
-  @Field(() => Int, { defaultValue: 20 })
+  @Field(() => Int, { nullable: true, defaultValue: 20 })
   @IsInt()
   @Max(40)
   @Min(1)
   @IsOptional()
   count: number;
 
-  @Field(() => Int, { defaultValue: 1 })
+  @Field(() => Int, { nullable: true, defaultValue: 1 })
   @IsInt()
   @Min(1)
   @IsOptional()

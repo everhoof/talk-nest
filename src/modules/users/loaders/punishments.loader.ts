@@ -1,6 +1,5 @@
 import { Injectable, Scope } from '@nestjs/common';
-import { OrderedNestDataLoader } from '@intelrug/nestjs-graphql-dataloader';
-import { InjectRepository } from '@nestjs/typeorm';
+import { OrderedNestDataLoader } from '@modules/common/graphql/dataloader';
 import { PunishmentsRepository } from '@modules/users/repositories/punishments.repository';
 import { Punishment } from '@modules/users/entities/punishments.entity';
 import { IsNull } from 'typeorm';
@@ -10,7 +9,7 @@ export class PunishmentsLoader extends OrderedNestDataLoader<
   { targetId: Punishment['targetId']; type: Punishment['type'] },
   Punishment
 > {
-  constructor(@InjectRepository(PunishmentsRepository) private readonly punishments: PunishmentsRepository) {
+  constructor(private readonly punishments: PunishmentsRepository) {
     super();
   }
 

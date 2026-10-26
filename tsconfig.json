@@ -3,14 +3,14 @@
     "files": true
   },
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "Node20",
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "esModuleInterop": true,
     "strictNullChecks": true,
-    "target": "ES2020",
+    "target": "ES2023",
     "sourceMap": true,
     "outDir": "./dist",
     "baseUrl": ".",
@@ -18,7 +18,14 @@
     "allowJs": true,
     "paths": {
       "@modules/*": ["src/modules/*"]
-    }
+    },
+    "moduleResolution": "Node16",
+    "rootDir": "./src",
+    "useDefineForClassFields": false,
+    "skipLibCheck": true,
+    "ignoreDeprecations": "6.0",
+    "strict": false,
+    "types": ["node", "express", "multer"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

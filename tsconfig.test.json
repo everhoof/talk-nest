@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "types": ["node", "express", "multer", "jest"],
+    "isolatedModules": true
+  },
+  "include": ["src/**/*", "test/**/*"]
+}

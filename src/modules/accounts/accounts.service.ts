@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { pbkdf2Sync, randomBytes } from 'crypto';
-import { InjectConnection, InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource } from '@nestjs/typeorm';
 import { TokensRepository } from '@modules/accounts/repositories/tokens.repository';
 import { UsersRepository } from '@modules/users/repositories/users.repository';
 import { SignInArgs } from '@modules/accounts/args/sign-in.args';
@@ -13,7 +13,7 @@ import {
 import { User, UserState } from '@modules/users/entities/users.entity';
 import { SignUpArgs } from '@modules/accounts/args/sign-up.args';
 import { RolesRepository } from '@modules/roles/repositories/roles.repository';
-import { Connection } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { ConfirmationsRepository } from '@modules/accounts/repositories/confirmations.repository';
 import { ConfirmationType } from '@modules/accounts/types/confirmation-type.enum';
 import { RequestPasswordResetArgs, ResetPasswordArgs } from '@modules/accounts/args/reset-password.args';
@@ -34,7 +34,7 @@ import { Utils } from '@modules/common/utils/utils';
 import got from 'got';
 import blacklist from 'the-big-username-blacklist';
 import { DateTime } from 'luxon';
-import { Config } from '@modules/config';
+import type { Config } from '@modules/config';
 import { Service } from '../../tokens';
 import { EventTypes } from '@modules/common/events/event-types';
 import { UserLoggedInEvent } from '@modules/common/events/user/logged-in.event';
@@ -42,7 +42,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class AccountsService {
-  private readonly logger = new Logger(AccountsService.name, true);
+  private readonly logger = new Logger(AccountsService.name);
 
   static loginEventQueue: number[] = [];
 
@@ -50,17 +50,12 @@ export class AccountsService {
     @Inject(Service.CONFIG)
     private readonly config: Config,
     private readonly eventEmitter: EventEmitter2,
-    @InjectConnection()
-    private readonly connection: Connection,
-    @InjectRepository(TokensRepository)
+    @InjectDataSource()
+    private readonly connection: DataSource,
     private readonly tokensRepository: TokensRepository,
-    @InjectRepository(UsersRepository)
     private readonly usersRepository: UsersRepository,
-    @InjectRepository(RolesRepository)
     private readonly rolesRepository: RolesRepository,
-    @InjectRepository(OAuthRepository)
     private readonly oauthRepository: OAuthRepository,
-    @InjectRepository(ConfirmationsRepository)
     private readonly confirmationsRepository: ConfirmationsRepository,
     private readonly mailerService: MailerService,
     @Inject('PUB_SUB') private readonly pubSub: PubSub,
@@ -141,7 +136,7 @@ export class AccountsService {
         .json<Record<string, string>>();
 
       return this.validateUserByDiscord(access_token, refresh_token, profile);
-    } catch (e) {
+    } catch {
       throw new InternalServerErrorException('UNKNOWN');
     }
   }
@@ -149,7 +144,7 @@ export class AccountsService {
   async validateUserByDiscord(
     accessToken: string,
     refreshToken: string,
-    profile: Record<string, unknown>,
+    profile: Record<string, string>,
   ): Promise<Token> {
     let newUserCreated = false;
 
@@ -309,7 +304,7 @@ export class AccountsService {
     const confirmation = await this.confirmationsRepository.getConfirmationByValue(args.token);
     if (!confirmation) throw new BadRequestException('CONFIRMATION_IS_INVALID');
 
-    const user = await this.usersRepository.findOne(confirmation.userId);
+    const user = await this.usersRepository.findOneBy({ id: confirmation.userId });
     if (!user) throw new BadRequestException('CONFIRMATION_IS_INVALID');
 
     await this.confirmationsRepository.delete(confirmation.id);
@@ -326,7 +321,7 @@ export class AccountsService {
     const confirmation = await this.confirmationsRepository.getConfirmationByValue(args.token);
     if (!confirmation) throw new BadRequestException('CONFIRMATION_IS_INVALID');
 
-    const user = await this.usersRepository.findOne(confirmation.userId);
+    const user = await this.usersRepository.findOneBy({ id: confirmation.userId });
     if (!user) throw new BadRequestException('CONFIRMATION_IS_INVALID');
 
     const { salt, hash } = this.createSaltHash(args.password);
@@ -356,9 +351,9 @@ export class AccountsService {
     return this.usersRepository.isExist(user.id);
   }
 
-  async getTokenByDiscordId(args: GetTokenByDiscordIdArgs): Promise<Token | undefined> {
+  async getTokenByDiscordId(args: GetTokenByDiscordIdArgs): Promise<Token | null> {
     const oauth = await this.oauthRepository.findOne({ where: { externalId: args.id, type: OAuthType.discord } });
-    if (!oauth) return;
+    if (!oauth) return null;
     return this.tokensRepository.createNewToken(oauth.userId);
   }
 

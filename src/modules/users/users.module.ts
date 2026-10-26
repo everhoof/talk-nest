@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersRepository } from '@modules/users/repositories/users.repository';
 import { UsersService } from '@modules/users/users.service';
 import { UsersResolver } from '@modules/users/users.resolver';
@@ -11,10 +10,16 @@ import { PicturesRepository } from '@modules/pictures/repositories/pictures.repo
 import { PunishmentsLoader } from '@modules/users/loaders/punishments.loader';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([UsersRepository, TokensRepository, PunishmentsRepository, PicturesRepository]),
-    MessagesModule,
+  imports: [MessagesModule],
+  providers: [
+    UsersRepository,
+    TokensRepository,
+    PunishmentsRepository,
+    PicturesRepository,
+    UsersService,
+    UsersResolver,
+    UsersLoader,
+    PunishmentsLoader,
   ],
-  providers: [UsersService, UsersResolver, UsersLoader, PunishmentsLoader],
 })
 export class UsersModule {}

@@ -1,24 +1,22 @@
-import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { ACGuard as OriginalACGuard } from 'nest-access-control';
+import { CanActivate, Injectable, ExecutionContext, SetMetadata, UnauthorizedException } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { IQueryInfo } from 'accesscontrol';
 import { User } from '@modules/users/entities/users.entity';
-import { Request } from 'express';
 import { GqlExecutionContext } from '@nestjs/graphql';
+import { roles } from '../../../app.roles';
+
+const requiredRoles = 'roles';
+export const UseRoles = (...permissions: IQueryInfo[]) => SetMetadata(requiredRoles, permissions);
 
 @Injectable()
-export class ACGuard extends OriginalACGuard {
-  private static getRequest(context: ExecutionContext): Request {
-    const ctx = GqlExecutionContext.create(context);
-    return ctx.getContext().req;
-  }
+export class ACGuard implements CanActivate {
+  constructor(private readonly reflector: Reflector) {}
 
-  protected async getUser(context: ExecutionContext): Promise<User> {
-    const request = ACGuard.getRequest(context);
-    if (!request.user) throw new UnauthorizedException();
-    return request.user as User;
-  }
-
-  protected async getUserRoles(context: ExecutionContext): Promise<string | string[]> {
-    const user = await this.getUser(context);
-    return user.roles.map((roles) => roles.name);
+  canActivate(context: ExecutionContext): boolean {
+    const permissions = this.reflector.get<IQueryInfo[]>(requiredRoles, context.getHandler());
+    if (!permissions) return true;
+    const user: User | undefined = GqlExecutionContext.create(context).getContext().req?.user;
+    if (!user) throw new UnauthorizedException();
+    return permissions.every((permission) => roles.permission({ ...permission, role: user.roleNames }).granted);
   }
 }

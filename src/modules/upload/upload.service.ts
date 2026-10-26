@@ -4,7 +4,6 @@ import got, { Got } from 'got';
 import FormData from 'form-data';
 import { writeFile, createFile } from 'fs-extra';
 import { extname, basename } from 'path';
-import { InjectRepository } from '@nestjs/typeorm';
 import { PicturesRepository } from '@modules/pictures/repositories/pictures.repository';
 import { PictureRepresentationsRepository } from '@modules/pictures/repositories/picture-representations.repository';
 import { Picture } from '@modules/pictures/entities/pictures.entity';
@@ -22,7 +21,7 @@ import { Utils } from '@modules/common/utils/utils';
 import { fromBuffer } from 'file-type';
 import { imageSize } from 'image-size';
 import { Service } from '../../tokens';
-import { Config } from '@modules/config';
+import type { Config } from '@modules/config';
 import { PunishmentTypes } from '@modules/users/args/punishment.args';
 import { PunishmentsRepository } from '@modules/users/repositories/punishments.repository';
 
@@ -30,14 +29,12 @@ import { PunishmentsRepository } from '@modules/users/repositories/punishments.r
 export class UploadService {
   private readonly httpClient: Got;
   private static queue: string[] = [];
-  private readonly logger = new Logger(UploadService.name, true);
+  private readonly logger = new Logger(UploadService.name);
 
   constructor(
     @Inject(Service.CONFIG) private readonly config: Config,
-    @InjectRepository(PicturesRepository) private readonly picturesRepository: PicturesRepository,
-    @InjectRepository(PictureRepresentationsRepository)
+    private readonly picturesRepository: PicturesRepository,
     private readonly pictureRepresentationsRepository: PictureRepresentationsRepository,
-    @InjectRepository(PunishmentsRepository)
     private readonly punishmentsRepository: PunishmentsRepository,
   ) {
     this.httpClient = got.extend({

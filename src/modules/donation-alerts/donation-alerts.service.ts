@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Service } from '../../tokens';
-import { Config } from '@modules/config';
+import type { Config } from '@modules/config';
 import Centrifuge from 'centrifuge';
 import WebSocket from 'ws';
 import got, { Got } from 'got';
@@ -15,12 +15,15 @@ global.XMLHttpRequest = XMLHttpRequest;
 
 @Injectable()
 export class DonationAlertsService {
-  private readonly logger = new Logger(DonationAlertsService.name, true);
+  private readonly logger = new Logger(DonationAlertsService.name);
   private centrifuge: Centrifuge;
   private httpClient: Got;
   private user: UserOAuth;
 
-  constructor(private readonly eventEmitter: EventEmitter2, @Inject(Service.CONFIG) private readonly config: Config) {
+  constructor(
+    private readonly eventEmitter: EventEmitter2,
+    @Inject(Service.CONFIG) private readonly config: Config,
+  ) {
     this.initializeHttpClient()
       .then(() => this.getUserOAuth())
       .then((user) => (this.user = user))

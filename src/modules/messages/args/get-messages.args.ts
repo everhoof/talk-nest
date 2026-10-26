@@ -3,14 +3,14 @@ import { IsBoolean, IsInt, IsISO8601, IsOptional, Max, Min } from 'class-validat
 
 @ArgsType()
 export class GetMessagesArgs {
-  @Field(() => Int, { defaultValue: 100 })
+  @Field(() => Int, { nullable: true, defaultValue: 100 })
   @IsInt()
   @Max(200)
   @Min(1)
   @IsOptional()
   count: number;
 
-  @Field(() => Int, { defaultValue: 1 })
+  @Field(() => Int, { nullable: true, defaultValue: 1 })
   @IsInt()
   @Min(1)
   @IsOptional()
@@ -27,11 +27,11 @@ export class GetMessagesArgs {
   @IsOptional()
   fromDateTime: string | null;
 
-  @Field(() => Boolean, { defaultValue: false })
+  @Field(() => Boolean, { nullable: true, defaultValue: false })
   @IsBoolean()
   reverse: boolean;
 
-  @Field(() => Boolean, { defaultValue: false })
+  @Field(() => Boolean, { nullable: true, defaultValue: false })
   @IsBoolean()
   poll: boolean;
 }

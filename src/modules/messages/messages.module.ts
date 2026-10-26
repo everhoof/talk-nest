@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { MessagesRepository } from '@modules/messages/repositories/messages.repository';
 import { MessagesService } from '@modules/messages/messages.service';
 import { MessagesResolver } from '@modules/messages/messages.resolver';
@@ -14,19 +13,19 @@ import { PollVotesRepository } from './repositories/poll-votes.repository';
 import { PollsRepository } from './repositories/polls.repository';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([
-      MessagesRepository,
-      PicturesRepository,
-      PunishmentsRepository,
-      UsersRepository,
-      PollVotesRepository,
-      PollsRepository,
-    ]),
-    AccountsModule,
-    UploadModule,
+  imports: [AccountsModule, UploadModule],
+  providers: [
+    MessagesRepository,
+    PicturesRepository,
+    PunishmentsRepository,
+    UsersRepository,
+    PollVotesRepository,
+    PollsRepository,
+    MessagesService,
+    MessagesResolver,
+    PollsService,
+    PollsResolver,
   ],
-  providers: [MessagesService, MessagesResolver, PollsService, PollsResolver],
   exports: [MessagesService],
 })
 export class MessagesModule {}

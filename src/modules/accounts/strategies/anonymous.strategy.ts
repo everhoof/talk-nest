@@ -3,4 +3,8 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-anonymous';
 
 @Injectable()
-export class AnonymousStrategy extends PassportStrategy(Strategy) {}
+export class AnonymousStrategy extends PassportStrategy(Strategy) {
+  validate(): undefined {
+    return undefined;
+  }
+}

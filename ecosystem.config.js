@@ -5,7 +5,7 @@ module.exports = {
     {
       name: process.env.APP_NAME,
       script: 'dist/main.js',
-      interpreter: 'node@14.18.1',
+      interpreter: process.env.API_NODE_EXECUTABLE || process.execPath,
       autorestart: true,
     },
   ],
