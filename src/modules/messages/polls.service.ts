@@ -9,6 +9,7 @@ import { PollVotesRepository } from './repositories/poll-votes.repository';
 import { PollsRepository } from './repositories/polls.repository';
 import { MessagesService } from './messages.service';
 import { CreatePollArgs, Poll, UpdatePollArgs, VotePollArgs } from './polls.types';
+import { getPollText, sanitizePollText } from './poll-formatting';
 
 @Injectable()
 export class PollsService {
@@ -27,7 +28,7 @@ export class PollsService {
     await this.messagesService.throwOnPunished(user.id);
 
     const options = this.prepareOptions(args.options);
-    const message = await this.polls.createPoll(user, args.question.trim(), options, {
+    const message = await this.polls.createPoll(user, sanitizePollText(args.question, 300), options, {
       isAnonymous: args.isAnonymous ?? false,
       allowMultiple: args.allowMultiple ?? false,
       allowChangeVote: args.allowChangeVote ?? false,
@@ -47,8 +48,11 @@ export class PollsService {
     await this.messagesService.throwOnPunished(user.id);
 
     const labels = this.prepareOptions(args.options.map((option) => option.label));
-    const options = args.options.map((option, index) => ({ id: option.id, label: labels[index] }));
-    const message = await this.polls.updatePoll(args.messageId, args.question.trim(), options, {
+    const options = args.options.map((option, index) => ({
+      id: option.id,
+      label: labels[index],
+    }));
+    const message = await this.polls.updatePoll(args.messageId, sanitizePollText(args.question, 300), options, {
       allowMultiple: args.allowMultiple ?? undefined,
       allowChangeVote: args.allowChangeVote ?? undefined,
       endsAt: args.endsAt,
@@ -60,8 +64,8 @@ export class PollsService {
   }
 
   private prepareOptions(options: string[]): string[] {
-    const labels = options.map((option) => option.trim());
-    const normalizedOptions = labels.map((option) => option.toLowerCase());
+    const labels = options.map((option) => sanitizePollText(option, 100));
+    const normalizedOptions = labels.map((option) => getPollText(option).trim().toLowerCase());
     const hasDuplicateOptions = new Set(normalizedOptions).size !== normalizedOptions.length;
 
     if (hasDuplicateOptions) {

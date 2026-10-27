@@ -21,7 +21,7 @@ class PollQuestionArgs {
   @Field()
   @IsString()
   @Matches(/\S/)
-  @MaxLength(300)
+  @MaxLength(20000)
   question: string;
 
   @Field(() => Boolean, { nullable: true })
@@ -53,7 +53,7 @@ export class CreatePollArgs extends PollQuestionArgs {
   @ArrayMaxSize(20)
   @IsString({ each: true })
   @Matches(/\S/, { each: true })
-  @MaxLength(100, { each: true })
+  @MaxLength(8000, { each: true })
   options: string[];
 }
 
@@ -76,7 +76,7 @@ export class UpdatePollOptionInput {
   @Field()
   @IsString()
   @Matches(/\S/)
-  @MaxLength(100)
+  @MaxLength(8000)
   label: string;
 }
 

@@ -12,8 +12,11 @@ import type { PollOptionCount } from '../types/poll-option-count';
 import { PollVotesRepository } from './poll-votes.repository';
 import { MessagesRepository } from './messages.repository';
 
-type PollSettings = Pick<MessagePoll, 'allowMultiple' | 'allowChangeVote' | 'endsAt'> & { isAnonymous?: boolean };
+type PollSettings = Pick<MessagePoll, 'allowMultiple' | 'allowChangeVote' | 'endsAt'> & {
+  isAnonymous?: boolean;
+};
 type PollEditableSettings = Pick<MessagePoll, 'allowMultiple' | 'allowChangeVote' | 'endsAt'>;
+type EditablePollOption = { id?: number | null; label: string };
 
 @EntityRepository(MessagePoll)
 export class PollsRepository extends BasicRepository<MessagePoll> {
@@ -55,7 +58,11 @@ export class PollsRepository extends BasicRepository<MessagePoll> {
       });
       await manager.insert(
         MessagePollOption,
-        labels.map((label, position) => ({ messageId: message.id, label, position })),
+        labels.map((label, position) => ({
+          messageId: message.id,
+          label,
+          position,
+        })),
       );
 
       return message;
@@ -109,7 +116,7 @@ export class PollsRepository extends BasicRepository<MessagePoll> {
   async updatePoll(
     messageId: number,
     question: string,
-    options: { id?: number | null; label: string }[],
+    options: EditablePollOption[],
     settings: Partial<PollEditableSettings>,
   ): Promise<Message> {
     return this.manager.transaction(async (manager) => {
@@ -164,11 +171,7 @@ export class PollsRepository extends BasicRepository<MessagePoll> {
     this.validateEndTime(endsAt);
   }
 
-  private async updateOptions(
-    manager: EntityManager,
-    messageId: number,
-    options: { id?: number | null; label: string }[],
-  ): Promise<void> {
+  private async updateOptions(manager: EntityManager, messageId: number, options: EditablePollOption[]): Promise<void> {
     const previousOptions = await manager.find(MessagePollOption, { messageId });
     const previousIds = new Set(previousOptions.map((option) => option.id));
     const retainedIds = options.flatMap((option) => (option.id == null ? [] : [option.id]));
@@ -188,9 +191,16 @@ export class PollsRepository extends BasicRepository<MessagePoll> {
 
     for (const [position, option] of options.entries()) {
       if (option.id != null) {
-        await manager.update(MessagePollOption, option.id, { label: option.label, position });
+        await manager.update(MessagePollOption, option.id, {
+          label: option.label,
+          position,
+        });
       } else {
-        await manager.insert(MessagePollOption, { messageId, label: option.label, position });
+        await manager.insert(MessagePollOption, {
+          messageId,
+          label: option.label,
+          position,
+        });
       }
     }
   }

@@ -67,6 +67,47 @@ describe('PollsService', () => {
     expect(polls.createPoll).not.toHaveBeenCalled();
   });
 
+  it('stores sanitized HTML directly in the question and options', async () => {
+    const creator = Object.assign(new User(), { id: 2, roles: [{ name: AppRoles.MODERATOR }] });
+    await service.createPoll(
+      {
+        question: '<strong class="x">Тема</strong>',
+        options: ['<em>Рок</em>'],
+      },
+      creator,
+    );
+    expect(polls.createPoll).toHaveBeenCalledWith(
+      creator,
+      '<strong>Тема</strong>',
+      ['<em>Рок</em>'],
+      expect.objectContaining({ allowMultiple: false }),
+    );
+  });
+
+  it('rejects duplicate answers despite different formatting and encoded entities', async () => {
+    const creator = Object.assign(new User(), { id: 2, roles: [{ name: AppRoles.MODERATOR }] });
+    await expect(
+      service.createPoll({ question: 'Тема', options: ['<strong>Рок</strong>', '<em>рок</em>'] }, creator),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.createPoll({ question: 'Тема', options: ['A &amp; B', '<u>A &#38; B</u>'] }, creator),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(polls.createPoll).not.toHaveBeenCalled();
+  });
+
+  it('returns formatting alongside hidden results before voting', async () => {
+    const data = await polls.getPollData();
+    polls.getPollData.mockResolvedValue({
+      ...data,
+      poll: { ...data.poll, question: '<strong>Что послушаем?</strong>' },
+      options: [{ id: 11, label: '<em>Рок</em>' }],
+    });
+    expect(await service.getPoll(10)).toMatchObject({
+      question: '<strong>Что послушаем?</strong>',
+      options: [{ label: '<em>Рок</em>', votes: null }],
+    });
+  });
+
   it('rejects options that differ only by whitespace or case', async () => {
     const creator = Object.assign(new User(), { id: 2, roles: [{ name: AppRoles.MODERATOR }] });
     await expect(service.createPoll({ question: 'Тема', options: ['Рок', ' рок '] }, creator)).rejects.toBeInstanceOf(

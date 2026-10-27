@@ -92,6 +92,25 @@ describe('PollsRepository without a database', () => {
     ]);
   });
 
+  it('updates formatted text while preserving the option identities', async () => {
+    await repository.updatePoll(
+      10,
+      '<strong>Тема</strong>',
+      [
+        { id: 11, label: '<em>Рок</em>' },
+        { id: 12, label: 'Джаз' },
+      ],
+      {},
+    );
+    expect(poll.question).toBe('<strong>Тема</strong>');
+    expect(manager.update).toHaveBeenCalledWith(MessagePollOption, 11, {
+      label: '<em>Рок</em>',
+      position: 0,
+    });
+    expect(manager.insert).not.toHaveBeenCalled();
+    expect(manager.delete).not.toHaveBeenCalled();
+  });
+
   it('rejects creation with an expired deadline before starting a transaction', async () => {
     await expect(
       repository.createPoll(new User(), 'Тема', ['Рок'], {
@@ -131,7 +150,10 @@ describe('PollsRepository without a database', () => {
       ],
       {},
     );
-    expect(manager.update).toHaveBeenCalledWith(MessagePollOption, 12, { label: 'Джаз!', position: 0 });
+    expect(manager.update).toHaveBeenCalledWith(MessagePollOption, 12, {
+      label: 'Джаз!',
+      position: 0,
+    });
     expect(manager.update).toHaveBeenCalledWith(MessagePollOption, 11, { label: 'Рок!', position: 1 });
     expect(manager.findOne).toHaveBeenCalledWith(Message, 10, { lock: { mode: 'pessimistic_write' } });
     expect(manager.findOne.mock.invocationCallOrder[0]).toBeLessThan(manager.update.mock.invocationCallOrder[0]);
@@ -143,7 +165,11 @@ describe('PollsRepository without a database', () => {
     await repository.updatePoll(10, 'Тема', [options[1], { label: 'Поп' }], {});
     expect(manager.delete).toHaveBeenCalledTimes(1);
     expect(manager.delete).toHaveBeenCalledWith(MessagePollOption, { id: In([11]) });
-    expect(manager.insert).toHaveBeenCalledWith(MessagePollOption, { messageId: 10, label: 'Поп', position: 1 });
+    expect(manager.insert).toHaveBeenCalledWith(MessagePollOption, {
+      messageId: 10,
+      label: 'Поп',
+      position: 1,
+    });
   });
 
   it.each([
