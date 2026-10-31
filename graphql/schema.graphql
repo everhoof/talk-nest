@@ -121,6 +121,7 @@ type Query {
   isUsernameFree(username: String!): Boolean!
   getTokenByDiscordId(id: String!): Token
   getTokens: [Token!]!
+  getActivePolls: [Message!]!
   getPoll(messageId: Int!): Poll!
   getGrants: String!
   getHello: String!

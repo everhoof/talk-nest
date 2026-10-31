@@ -5,7 +5,7 @@ export class MessagePoll {
   @PrimaryColumn({ name: 'message_id', type: 'int' })
   messageId: number;
 
-  @Column({ type: 'varchar', length: 300 })
+  @Column({ type: 'text' })
   question: string;
 
   @Column({ name: 'is_anonymous', type: 'boolean', default: false })

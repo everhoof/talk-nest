@@ -8,7 +8,7 @@ export class MessagePollOption {
   @Column({ name: 'message_id', type: 'int' })
   messageId: number;
 
-  @Column({ type: 'varchar', length: 100 })
+  @Column({ type: 'text' })
   label: string;
 
   @Column({ type: 'int' })
